@@ -1,0 +1,104 @@
+"""
+    $(TYPEDEF)
+
+Partitioning `num_elems` elements / jobs over maximum `max_tasks` tasks with minimum `min_elems`
+elements per task.
+
+# Methods
+    TaskPartitioner(num_elems, max_tasks=Threads.nthreads(), min_elems=1)
+
+# Fields
+    $(TYPEDFIELDS)
+
+# Examples
+
+```jldoctest
+using IBVH: TaskPartitioner
+
+# Divide 10 elements between 4 tasks
+tp = TaskPartitioner(10, 4)
+for i in 1:tp.num_tasks
+    @show tp[i]
+end
+
+# output
+tp[i] = (1, 3)
+tp[i] = (4, 6)
+tp[i] = (7, 9)
+tp[i] = (10, 10)
+```
+
+```jldoctest
+using IBVH: TaskPartitioner
+
+# Divide 20 elements between 6 tasks with minimum 5 elements per task.
+# Not all tasks will be required
+tp = TaskPartitioner(20, 6, 5)
+for i in 1:tp.num_tasks
+    @show tp[i]
+end
+
+# output
+tp[i] = (1, 5)
+tp[i] = (6, 10)
+tp[i] = (11, 15)
+tp[i] = (16, 20)
+```
+
+"""
+@with_kw struct TaskPartitioner
+    num_elems::Int64
+    max_tasks::Int64
+    min_elems::Int64
+    num_tasks::Int64    # computed
+end
+
+
+function TaskPartitioner(num_elems, max_tasks=Threads.nthreads(), min_elems=1)
+    # Number of tasks needed to have at least `min_nodes` per task
+    num_tasks = num_elems ÷ max_tasks >= min_elems ? max_tasks : num_elems ÷ min_elems
+    if num_tasks < 1
+        num_tasks = 1
+    end
+
+    TaskPartitioner(num_elems, max_tasks, min_elems, num_tasks)
+end
+
+
+function Base.getindex(tp::TaskPartitioner, itask::Integer)
+
+    @boundscheck 1 <= itask <= tp.num_tasks || throw(BoundsError(tp, itask))
+
+    # Compute element indices handled by this task
+    per_task = (tp.num_elems + tp.num_tasks - 1) ÷ tp.num_tasks
+
+    task_istart = (itask - 1) * per_task + 1
+    task_istop = min(itask * per_task, tp.num_elems)
+
+    task_istart, task_istop
+end
+
+
+Base.firstindex(tp::TaskPartitioner) = 1
+Base.lastindex(tp::TaskPartitioner) = tp.num_tasks
+Base.length(tp::TaskPartitioner) = tp.num_tasks
+
+
+
+
+# Fast ilog2 adapted from https://github.com/jlapeyre/ILog2.jl - thank you!
+# Included here directly to minimise dependencies and possible errors surface area
+const IntBits = Union{Int8, Int16, Int32, Int64, Int128,
+                      UInt8, UInt16, UInt32, UInt64, UInt128}
+
+ilog2(x, ::typeof(RoundUp)) = ispow2(x) ? ilog2(x) : ilog2(x) + 1
+ilog2(x, ::typeof(RoundDown)) = ilog2(x)
+
+@generated function msbindex(::Type{T}) where {T <: Integer}
+    sizeof(T) * 8 - 1
+end
+
+@inline function ilog2(n::T) where {T <: IntBits}
+    @boundscheck n > zero(T) || throw(DomainError(n))
+    msbindex(T) - leading_zeros(n)
+end
