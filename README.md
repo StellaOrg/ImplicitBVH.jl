@@ -7,7 +7,7 @@ and merged nodes above them can have different types - e.g. `BSphere{Float64}` l
 larger `BBox{Float64}`.
 
 The initial geometric primitives are sorted according to their Morton-encoded coordinates; the
-unsigned integer type used for the Morton encoding can be chosen between UInt16, UInt32 and UInt64.
+unsigned integer type used for the Morton encoding can be chosen between `UInt16`, `UInt32` and `UInt64`.
 
 Finally, the tree can be incompletely-built up to a given `built_level` and later start contact
 detection downwards from this level.
@@ -90,7 +90,7 @@ Check out the `benchmark` folder for an example traversing an STL model.
 
 The implicit tree formulation (genius idea!) which forms the core of the BVH structure originally appeared in the following paper:
 
-	Chitalu FM, Dubach C, Komura T. Binary Ostensibly‐Implicit Trees for Fast Collision Detection. InComputer Graphics Forum 2020 May (Vol. 39, No. 2, pp. 509-521).
+> Chitalu FM, Dubach C, Komura T. Binary Ostensibly‐Implicit Trees for Fast Collision Detection. InComputer Graphics Forum 2020 May (Vol. 39, No. 2, pp. 509-521).
 
 
 # License
