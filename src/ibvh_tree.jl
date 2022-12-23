@@ -618,7 +618,7 @@ function traverse_nodes_atomic!(bvh, src, dst, num_src, self_checks=true)
 
     # Index of current number of pair checks sprouted in `dst`; will be updated atomically by each
     # thread as new blocks of pair checks are added
-    num_dst = Threads.Atomic{Int64}(0)
+    num_dst = Threads.Atomic{Int}(0)
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
@@ -670,7 +670,7 @@ end
 
 function traverse_leaves_atomic!(bvh, src, contacts, num_src)
     # Traverse final level, only doing leaf-leaf checks
-    num_contacts = Threads.Atomic{Int64}(0)
+    num_contacts = Threads.Atomic{Int}(0)
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
