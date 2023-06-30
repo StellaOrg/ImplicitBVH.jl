@@ -5,6 +5,8 @@
 
 
 using IBVH
+using IBVH: BSphere, BBox
+
 using MeshIO
 using FileIO
 
@@ -13,12 +15,14 @@ using Profile
 using PProf
 
 
+# Types used
 const LeafType = BSphere{Float32}
 const MortonType = UInt32
 
 
-# Load mesh and compute bounding spheres for each triangle
-mesh = load((@__DIR__) * "/xyzrgb_dragon.obj")
+# Load mesh and compute bounding spheres for each triangle. Can download mesh from:
+# https://github.com/alecjacobson/common-3d-test-models/blob/master/data/xyzrgb_dragon.obj
+mesh = load(joinpath(@__DIR__, "xyzrgb_dragon.obj"))
 @show size(mesh) Threads.nthreads()
 bounding_spheres = [LeafType(tri) for tri in mesh]
 

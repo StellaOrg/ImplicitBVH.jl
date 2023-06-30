@@ -1,7 +1,7 @@
 """
     $(TYPEDEF)
 
-Acceptable unsigned integer types for Morton encoding.
+Acceptable unsigned integer types for Morton encoding: $(MortonUnsigned).
 """
 const MortonUnsigned = Union{UInt16, UInt32, UInt64}
 
@@ -143,15 +143,15 @@ end
 
 
 """
-    morton_encode(bounding_volumes, U::MortonUnsignedType=UInt32)
-    morton_encode!(mortons, bounding_volumes, U)
-    morton_encode!(mortons, bounding_volumes, mins, maxs, U)
+    morton_encode!(mortons::AbstractVector{U}, bounding_volumes) where {U <: MortonUnsigned}
+    morton_encode!(mortons::AbstractVector{U}, bounding_volumes, mins, maxs)
 
-Encode each bounding volume into Vector{U} of corresponding Morton codes such that they uniformly
-cover the maximum Morton range given an unsigned integer type U.
+Encode each bounding volume into vector of corresponding Morton codes such that they uniformly
+cover the maximum Morton range given an unsigned integer type `U <: ` [`MortonUnsigned`](@ref).
 
-If not provided, allocate Vector{U} for Morton codes. Likewise, compute dimension-wise exclusive
-minima and maxima if not provided.
+!!! warning
+    The dimension-wise exclusive `mins` and `maxs` *must* be correct; if any bounding volume center
+    is equal to, or beyond `mins` / `maxs`, the results will be silently incorrect.
 """
 function morton_encode!(
     mortons::AbstractVector{U},
@@ -160,9 +160,20 @@ function morton_encode!(
     maxs,
 ) where {U <: MortonUnsigned}
 
-    # Bounds checking and trivial case
+    # Bounds checking
     @assert firstindex(mortons) == firstindex(bounding_volumes) == 1
-    @boundscheck @assert length(mortons) == length(bounding_volumes)
+    @boundscheck begin
+        @assert length(mortons) == length(bounding_volumes)
+        @assert length(mins) == length(maxs) == 3
+        for bv in bounding_volumes
+            bounding_volume_center = center(bv)
+            @assert mins[1] < bounding_volume_center[1] < maxs[1]
+            @assert mins[2] < bounding_volume_center[2] < maxs[2]
+            @assert mins[3] < bounding_volume_center[3] < maxs[3]
+        end
+    end
+
+    # Trivial case
     length(bounding_volumes) == 0 && return nothing
 
     # Encode bounding volumes' centres across multiple threads using contiguous ranges
@@ -200,6 +211,12 @@ function morton_encode!(mortons::AbstractVector{U}, bounding_volumes) where {U <
 end
 
 
+"""
+    morton_encode(bounding_volumes, ::Type{U}=UInt) where {U <: MortonUnsigned}
+
+Encode the centers of some `bounding_volumes` as Morton codes of type `U <: `
+[`MortonUnsigned`](@ref). See [`morton_encode!`](@ref) for full details. 
+"""
 function morton_encode(bounding_volumes, ::Type{U}=UInt) where {U <: MortonUnsigned}
     # Pre-allocate vector of morton codes
     mortons = similar(bounding_volumes, U)

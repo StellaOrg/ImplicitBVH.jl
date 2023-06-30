@@ -3,7 +3,7 @@
 
 ```@docs
 IBVH.MortonUnsigned
-IBVH.MortonUnsignedType
+IBVH.morton_encode
 IBVH.morton_encode!
 IBVH.morton_encode_single
 IBVH.morton_scaling

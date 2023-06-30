@@ -1,7 +1,8 @@
 """
     $(TYPEDEF)
 
-Collected statistics about a BVH construction and contact traversal.
+Collected statistics about a BVH construction and contact traversal; populated after calling
+[`traverse`](@ref).
 
 # Fields
     $(TYPEDFIELDS)
@@ -19,36 +20,42 @@ end
 
 Implicit bounding volume hierarchy constructed from an iterable of some geometric primitives'
 (e.g. triangles in a mesh) bounding volumes forming the [`ImplicitTree`](@ref) leaves. The leaves
-and merged nodes above them can have different types - e.g. BSphere{Float64} for leaves merged into
-larger BBox{Float64}.
+and merged nodes above them can have different types - e.g. `BSphere{Float64}` for leaves
+merged into larger `BBox{Float64}`.
 
 The initial geometric primitives are sorted according to their Morton-encoded coordinates; the
-unsigned integer type used for the Morton encoding can be chosen between UInt16, UInt32 and UInt64.
+unsigned integer type used for the Morton encoding can be chosen between `$(MortonUnsigned)`.
 
 Finally, the tree can be incompletely-built up to a given `built_level` and later start contact
 detection downwards from this level, e.g.:
 
 ```
-Implicit tree from 11 bounding volumes - the virtual nodes are not stored in memory
-Level                                               Nodes
-  1                                                   1
-  2                              2                                          3
-  3                  4                     5                     6                       7v
-  4            8           9         10         11         12         13          14v          15v
-  5         16   17     18   19    20  21     22  23     24  25     26  27v    28v   29v    30v   31v
-            -------------------------Real-----------------------------  -----------Virtual-----------
+Implicit tree from 5 bounding volumes - i.e. the real leaves
+
+Tree Level          Nodes & Leaves               Build Up    Traverse Down
+    1                     1                         Ʌ              |
+    2             2               3                 |              |
+    3         4       5       6        7v           |              |
+    4       8   9   10 11   12 13v  14v  15v        |              V
+            -----Real----   -----Virtual----
 ```
 
 # Methods
-    BVH(
+    function BVH(
         bounding_volumes::AbstractVector{L},
         node_type::Type{N}=L,
-        morton_type::MortonUnsignedType=UInt64,
+        morton_type::Type{U}=UInt,
         built_level::Integer=1,
-    ) where {N, L}
+    ) where {L, N, U <: MortonUnsigned}
 
 # Fields
-    $(TYPEDFIELDS)
+    tree::ImplicitTree{Int}
+    nodes::VN   <: AbstractVector
+    leaves::VL  <: AbstractVector
+    order::VO   <: AbstractVector
+    built_level::Int
+    stats::BVHStats
+
 
 # Examples
 
@@ -56,6 +63,7 @@ Simple usage with bounding spheres and default 64-bit types:
 
 ```jldoctest
 using IBVH
+using IBVH: BSphere
 using StaticArrays
 
 # Generate some simple bounding spheres
@@ -84,6 +92,7 @@ Morton codes:
 
 ```jldoctest
 using IBVH
+using IBVH: BBox, BSphere
 using StaticArrays
 
 # Generate some simple bounding spheres
@@ -151,7 +160,7 @@ function BVH(
 
     # Compute morton codes for the bounding volumes
     mortons = similar(bounding_volumes, morton_type)
-    morton_encode!(mortons, bounding_volumes)
+    @inbounds morton_encode!(mortons, bounding_volumes)
 
     # Compute indices that sort codes along the Z-curve - closer objects have closer Morton codes
     order = sortperm(mortons)

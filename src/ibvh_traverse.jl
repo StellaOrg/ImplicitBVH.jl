@@ -45,6 +45,7 @@ traversals.
 
 ```jldoctest
 using IBVH
+using IBVH: BBox, BSphere
 using StaticArrays
 
 # Generate some simple bounding spheres

@@ -10,7 +10,6 @@ traverse
 ### Other BVH Interfaces
 
 ```@docs
-BVHLeaf
 BVHTraversal
 IBVH.BVHStats
 IBVH.IndexPair

@@ -1,8 +1,8 @@
 # Bounding Volumes
 
 ```@docs
-BBox
-BSphere
+IBVH.BBox
+IBVH.BSphere
 ```
 
 ## Query Functions
