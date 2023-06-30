@@ -1,3 +1,6 @@
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://stellaorg.github.io/IBVH.jl/stable)
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://stellaorg.github.io/IBVH.jl/dev)
+
 # IBVH.jl
 *Robust Multithreaded Bounding Volume Hierarchy for Collision Detection in Dynamic Scenes*
 
