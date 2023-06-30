@@ -37,7 +37,7 @@ Tree Level          Nodes & Leaves               Build Up    Traverse Down
     2             2               3                 |              |
     3         4       5       6        7v           |              |
     4       8   9   10 11   12 13v  14v  15v        |              V
-            -----Real----   -----Virtual----
+            -------Real------- ---Virtual---
 ```
 
 # Methods

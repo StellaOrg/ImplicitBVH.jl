@@ -2,7 +2,7 @@
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://stellaorg.github.io/IBVH.jl/dev)
 
 # IBVH.jl
-*Robust Multithreaded Bounding Volume Hierarchy for Collision Detection in Dynamic Scenes*
+*Fast, Robust Parallel Bounding Volume Hierarchy for Collision Detection in Dynamic Scenes*
 
 It uses an implicit bounding volume hierarchy constructed from an iterable of some geometric
 primitives' (e.g. triangles in a mesh) bounding volumes forming the `ImplicitTree` leaves. The leaves
@@ -98,7 +98,7 @@ Tree Level          Nodes & Leaves               Build Up    Traverse Down
     2             2               3                 |              |
     3         4       5       6        7v           |              |
     4       8   9   10 11   12 13v  14v  15v        |              V
-            -----Real----   -----Virtual----
+            -------Real------- ---Virtual---
 ```
 
 We do not need to store the "virtual" nodes in memory; rather, we can compute the number of virtual
