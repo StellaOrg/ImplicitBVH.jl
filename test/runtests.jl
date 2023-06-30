@@ -5,7 +5,7 @@ using Random
 using StaticArrays
 
 
-function test_implicit_tree()
+@testset "test_implicit_tree" begin
 
     # Perfect, filled tree
     #          1
@@ -57,12 +57,10 @@ function test_implicit_tree()
 
 end
 
-test_implicit_tree()
 
 
 
-
-function test_bsphere()
+@testset "test_bsphere" begin
 
     # Planar equilateral triangle
     p1 = SVector{3}((0., 0., 0.))
@@ -132,12 +130,10 @@ function test_bsphere()
 
 end
 
-test_bsphere()
 
 
 
-
-function test_bbox()
+@testset "test_bbox" begin
 
     # Cubically-placed points
     p1 = SVector{3}((0., 0., 0.))
@@ -198,12 +194,10 @@ function test_bbox()
 
 end
 
-test_bbox()
 
 
 
-
-function test_morton()
+@testset "test_morton" begin
 
     # Single numbers
     x = UInt32(0x111)
@@ -246,14 +240,12 @@ function test_morton()
 
 end
 
-test_morton()
 
 
 
+@testset "test_bvh" begin
 
-function test_bvh()
-
-    # Simple bounding spheres traversal test
+    # Simple, ordered bounding spheres traversal test
     bvs = [
         BSphere(SA[0., 0, 0], 0.5),
         BSphere(SA[0., 0, 1], 0.6),
@@ -262,7 +254,29 @@ function test_bvh()
         BSphere(SA[0., 0, 4], 0.6),
     ]
 
+    # Build the following IBVH from 5 bounding volumes:
+    #
+    #         Nodes & Leaves                Tree Level
+    #               1                       1
+    #       2               3               2
+    #   4       5       6        7v         3
+    # 8   9   10 11   12 13v  14v  15v      4
     bvh = BVH(bvs)
+    @test length(bvh.nodes) == 6
+
+    # Level 3
+    @test bvh.nodes[4].x ≈ (bvs[1] + bvs[2]).x      # First two BVs are paired
+    @test bvh.nodes[5].x ≈ (bvs[3] + bvs[4]).x      # Next two BVs are paired
+    @test bvh.nodes[6].x ≈ bvs[5].x                 # Last BV has no pair
+
+    # Level 2
+    @test bvh.nodes[2].x ≈ ((bvs[1] + bvs[2]) + (bvs[3] + bvs[4])).x
+    @test bvh.nodes[3].x ≈ bvs[5].x
+
+    # Root
+    @test bvh.nodes[1].x ≈ ((bvs[1] + bvs[2]) + (bvs[3] + bvs[4]) + bvs[5]).x
+
+    # Find contacting pairs
     traversal = traverse(bvh)
 
     @test length(traversal.contacts) == 3
@@ -270,7 +284,72 @@ function test_bvh()
     @test (1, 2) in traversal.contacts
     @test (2, 3) in traversal.contacts
 
+    # Bounding spheres traversal test with unordered spheres
+    bvs = [
+        BSphere(SA[0., 0, 1], 0.6),
+        BSphere(SA[0., 0, 2], 0.5),
+        BSphere(SA[0., 0, 0], 0.5),
+        BSphere(SA[0., 0, 4], 0.6),
+        BSphere(SA[0., 0, 3], 0.4),
+    ]
+
+    # Build the following IBVH from 5 bounding volumes:
+    #
+    #         Nodes & Leaves                Tree Level
+    #               1                       1
+    #       2               3               2
+    #   4       5       6        7v         3
+    # 8   9   10 11   12 13v  14v  15v      4
+    bvh = BVH(bvs)
+    @test length(bvh.nodes) == 6
+
+    # Level 3
+    @test bvh.nodes[4].x ≈ (bvs[3] + bvs[1]).x      # First two BVs are paired
+    @test bvh.nodes[5].x ≈ (bvs[2] + bvs[5]).x      # Next two BVs are paired
+    @test bvh.nodes[6].x ≈ bvs[4].x                 # Last BV has no pair
+
+    # Level 2
+    @test bvh.nodes[2].x ≈ ((bvs[3] + bvs[1]) + (bvs[2] + bvs[5])).x
+    @test bvh.nodes[3].x ≈ bvs[4].x
+
+    # Root
+    @test bvh.nodes[1].x ≈ ((bvs[3] + bvs[1]) + (bvs[2] + bvs[5]) + bvs[4]).x
+
+    # Find contacting pairs
+    traversal = traverse(bvh)
+
+    @test length(traversal.contacts) == 3
+    @test (4, 5) in traversal.contacts
+    @test (1, 3) in traversal.contacts
+    @test (1, 2) in traversal.contacts
+
+    # Random bounding volumes; fairly dense, about 45 out of 100 are in contact
+    Random.seed!(42)
+    bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:100])
+
+    # Brute force contact detection
+    brute_contacts = IBVH.IndexPair[]
+    for i in 1:length(bvs)
+        for j in i + 1:length(bvs)
+            if IBVH.iscontact(bvs[i], bvs[j])
+                push!(brute_contacts, (i, j))
+            end
+        end
+    end
+
+    # IBVH-based contact detection
+    bvh = BVH(bvs, BBox{Float64})
+    traversal = traverse(bvh)
+    bvh_contacts = traversal.contacts
+
+    # Ensure IBVH finds same contacts as checking all possible pairs
+    @test length(brute_contacts) == length(bvh_contacts)
+    for brute_contact in brute_contacts
+        @test brute_contact in bvh_contacts
+    end
+
     # Testing different settings
+    BVH(bvs, BSphere{Float64})
     BVH(bvs, BBox{Float64})
     BVH(bvs, BBox{Float64}, UInt32)
     BVH(bvs, BBox{Float64}, UInt32, 3)
@@ -278,5 +357,3 @@ function test_bvh()
     traverse(bvh, 3)
     traverse(bvh, 3, traversal)
 end
-
-test_bvh()

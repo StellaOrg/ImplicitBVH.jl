@@ -47,10 +47,10 @@ tp[i] = (16, 20)
 
 """
 @with_kw struct TaskPartitioner
-    num_elems::Int64
-    max_tasks::Int64
-    min_elems::Int64
-    num_tasks::Int64    # computed
+    num_elems::Int
+    max_tasks::Int
+    min_elems::Int
+    num_tasks::Int      # computed
 end
 
 

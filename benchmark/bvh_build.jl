@@ -13,24 +13,26 @@ using Profile
 using PProf
 
 
+const LeafType = BSphere{Float32}
+const NodeType = BBox{Float32}
+const MortonType = UInt32
+
+
 # Load mesh and compute bounding spheres for each triangle
-mesh = load("cloth_ball70.stl")
-bounding_spheres = [BBox{Float32}(tri) for tri in mesh]
+mesh = load((@__DIR__) * "/xyzrgb_dragon.obj")
+@show size(mesh)
+bounding_spheres = [LeafType(tri) for tri in mesh]
 
 # Pre-compile BVH build
-bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
+bvh = BVH(bounding_spheres, NodeType, MortonType)
 
 # Benchmark BVH creation including Morton encoding
 println("BVH creation including Morton encoding:")
-display(@benchmark(BVH(bounding_spheres, BBox{Float32}, UInt32)))
+display(@benchmark(BVH(bounding_spheres, NodeType, MortonType)))
 
-# Benchmark BVH creation including Morton encoding
-println("BVH creation with pre-computed Morton codes:")
-display(@benchmark(BVH(bvh.leaves, BBox{Float32}, UInt32)))
-
-# Collect a pprof profile
+# Collect a pprof profile of the complete build
 Profile.clear()
-@profile BVH(bounding_spheres, BBox{Float32}, UInt32)
+@profile BVH(bounding_spheres, NodeType, MortonType)
 
 # Export pprof profile and open interactive profiling web interface.
-pprof()
+pprof(; out="bvh_build.pb.gz")

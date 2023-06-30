@@ -25,6 +25,7 @@ include("utils.jl")
 include("morton.jl")
 include("implicit_tree.jl")
 include("bounding_volumes.jl")
-include("ibvh_tree.jl")
+include("ibvh_build.jl")
+include("ibvh_traverse.jl")
 
 end     # module IBVH
