@@ -9,7 +9,6 @@ Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
-SyncSort = "3aad29fc-5640-4e8d-a22d-e10722c484ad"
 
 [compat]
 DocStringExtensions = "0.9"

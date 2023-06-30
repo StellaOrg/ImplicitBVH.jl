@@ -7,14 +7,12 @@
 module IBVH
 
 # Functionality exported by this package by default
-export BVH, BVHLeaf, BVHTraversal, traverse
+export BVH, BVHTraversal, traverse
 export ImplicitTree, memory_index, level_indices, isvirtual
-export BSphere, BBox, center, radius, lower, upper
 
 
 # Internal dependencies
 using LinearAlgebra
-
 using Parameters
 using StaticArrays
 using DocStringExtensions

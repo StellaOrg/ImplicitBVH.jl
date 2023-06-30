@@ -1,4 +1,5 @@
 using IBVH
+using IBVH: BBox, BSphere
 
 using Test
 using Random
