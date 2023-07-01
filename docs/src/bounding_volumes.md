@@ -1,16 +1,16 @@
 # Bounding Volumes
 
 ```@docs
-IBVH.BBox
-IBVH.BSphere
+ImplicitBVH.BBox
+ImplicitBVH.BSphere
 ```
 
 ## Query Functions
 
 ```@docs
-IBVH.iscontact
-IBVH.center
-IBVH.radius
-IBVH.lower
-IBVH.upper
+ImplicitBVH.iscontact
+ImplicitBVH.center
+ImplicitBVH.radius
+ImplicitBVH.lower
+ImplicitBVH.upper
 ```

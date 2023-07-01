@@ -4,8 +4,8 @@
 # Date   : 15.12.2022
 
 
-using IBVH
-using IBVH: BSphere, BBox
+using ImplicitBVH
+using ImplicitBVH: BSphere, BBox
 
 using MeshIO
 using FileIO

@@ -4,8 +4,8 @@
 # Date   : 29.06.2023
 
 
-using IBVH
-using IBVH: BSphere, BBox
+using ImplicitBVH
+using ImplicitBVH: BSphere, BBox
 
 using MeshIO
 using FileIO
@@ -27,18 +27,18 @@ mesh = load(joinpath(@__DIR__, "xyzrgb_dragon.obj"))
 bounding_spheres = [LeafType(tri) for tri in mesh]
 
 # Pre-compile bounding volume extrema computation
-IBVH.bounding_volumes_extrema(bounding_spheres)
+ImplicitBVH.bounding_volumes_extrema(bounding_spheres)
 println("Bounding volume extrema:")
-display(@benchmark(IBVH.bounding_volumes_extrema(bounding_spheres)))
+display(@benchmark(ImplicitBVH.bounding_volumes_extrema(bounding_spheres)))
 
 # Pre-compile morton encoding
-mortons = IBVH.morton_encode(bounding_spheres, MortonType)
+mortons = ImplicitBVH.morton_encode(bounding_spheres, MortonType)
 println("Morton encoding:")
-display(@benchmark(IBVH.morton_encode(bounding_spheres, MortonType)))
+display(@benchmark(ImplicitBVH.morton_encode(bounding_spheres, MortonType)))
 
 # Collect a pprof profile of the complete build
 Profile.clear()
-@profile IBVH.morton_encode(bounding_spheres, MortonType)
+@profile ImplicitBVH.morton_encode(bounding_spheres, MortonType)
 
 # Export pprof profile and open interactive profiling web interface.
 pprof(; out="morton.pb.gz")

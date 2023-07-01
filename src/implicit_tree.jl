@@ -14,7 +14,7 @@ breadth-first search.
 # Examples
 
 ```julia
-julia> using IBVH
+julia> using ImplicitBVH
 
 # Given 5 geometric elements (e.g. bounding boxes) we construct the following implicit tree
 # having the 5 real leaves at implicit indices 8-12 plus 3 virtual leaves.

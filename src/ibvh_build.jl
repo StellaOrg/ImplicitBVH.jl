@@ -49,12 +49,12 @@ Tree Level          Nodes & Leaves               Build Up    Traverse Down
     ) where {L, N, U <: MortonUnsigned}
 
 # Fields
-    tree::ImplicitTree{Int}
-    nodes::VN   <: AbstractVector
-    leaves::VL  <: AbstractVector
-    order::VO   <: AbstractVector
-    built_level::Int
-    stats::BVHStats
+- `tree::`[`ImplicitTree`](@ref)`{Int}`
+- `nodes::VN <: AbstractVector`
+- `leaves::VL <: AbstractVector`
+- `order::VO <: AbstractVector`
+- `built_level::Int`
+- `stats::`[`BVHStats`](@ref)
 
 
 # Examples
@@ -62,8 +62,8 @@ Tree Level          Nodes & Leaves               Build Up    Traverse Down
 Simple usage with bounding spheres and default 64-bit types:
 
 ```jldoctest
-using IBVH
-using IBVH: BSphere
+using ImplicitBVH
+using ImplicitBVH: BSphere
 using StaticArrays
 
 # Generate some simple bounding spheres
@@ -91,8 +91,8 @@ Using `Float32` bounding spheres for leaves, `Float32` bounding boxes for nodes 
 Morton codes:
 
 ```jldoctest
-using IBVH
-using IBVH: BBox, BSphere
+using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
 using StaticArrays
 
 # Generate some simple bounding spheres
@@ -177,7 +177,7 @@ function BVH(
 end
 
 
-# Build OIBVH nodes above the leaf-level from the bottom up, inplace
+# Build ImplicitBVH nodes above the leaf-level from the bottom up, inplace
 function aggregate_oibvh!(bvh_nodes, bvh_leaves, tree, order, built_level=1)
 
     # Special case: aggregate level above leaves - might have different node types

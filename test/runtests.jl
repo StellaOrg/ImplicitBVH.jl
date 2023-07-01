@@ -1,5 +1,5 @@
-using IBVH
-using IBVH: BBox, BSphere
+using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
 
 using Test
 using Random
@@ -202,43 +202,42 @@ end
 
     # Single numbers
     x = UInt32(0x111)
-    m = IBVH.morton_split3(x)
+    m = ImplicitBVH.morton_split3(x)
     @test m == 0x1001001
 
     x = UInt64(0x111)
-    m = IBVH.morton_split3(x)
+    m = ImplicitBVH.morton_split3(x)
     @test m == 0x1001001
 
     # Random bounding volumes
     Random.seed!(42)
 
     bv = map(BSphere, [rand(3, 3) for _ in 1:10])
-    IBVH.morton_encode(bv, UInt32)
-    IBVH.morton_encode(bv, UInt64)
-    IBVH.morton_encode(bv)
+    ImplicitBVH.morton_encode(bv, UInt32)
+    ImplicitBVH.morton_encode(bv, UInt64)
+    ImplicitBVH.morton_encode(bv)
 
     bv = map(BBox, [rand(3, 3) for _ in 1:10])
-    IBVH.morton_encode(bv, UInt32)
-    IBVH.morton_encode(bv, UInt64)
-    IBVH.morton_encode(bv)
+    ImplicitBVH.morton_encode(bv, UInt32)
+    ImplicitBVH.morton_encode(bv, UInt64)
+    ImplicitBVH.morton_encode(bv)
 
     bv = map(BSphere{Float32}, [rand(3, 3) for _ in 1:10])
-    IBVH.morton_encode(bv, UInt32)
-    IBVH.morton_encode(bv, UInt64)
-    IBVH.morton_encode(bv)
+    ImplicitBVH.morton_encode(bv, UInt32)
+    ImplicitBVH.morton_encode(bv, UInt64)
+    ImplicitBVH.morton_encode(bv)
 
     bv = map(BBox{Float32}, [rand(3, 3) for _ in 1:10])
-    IBVH.morton_encode(bv, UInt32)
-    IBVH.morton_encode(bv, UInt64)
-    IBVH.morton_encode(bv)
+    ImplicitBVH.morton_encode(bv, UInt32)
+    ImplicitBVH.morton_encode(bv, UInt64)
+    ImplicitBVH.morton_encode(bv)
 
     # Degenerate inputs
     a = BSphere(SVector{3}((0., 0., 0.)), 0.5)
     b = BSphere(SVector{3}((1., 0., 0.)), 0.1)
-    IBVH.morton_encode([a, b], UInt32)
-    IBVH.morton_encode([a, a], UInt32)
-    IBVH.morton_encode([a], UInt32)
-
+    ImplicitBVH.morton_encode([a, b], UInt32)
+    ImplicitBVH.morton_encode([a, a], UInt32)
+    ImplicitBVH.morton_encode([a], UInt32)
 end
 
 
@@ -255,7 +254,7 @@ end
         BSphere(SA[0., 0, 4], 0.6),
     ]
 
-    # Build the following IBVH from 5 bounding volumes:
+    # Build the following ImplicitBVH from 5 bounding volumes:
     #
     #         Nodes & Leaves                Tree Level
     #               1                       1
@@ -294,7 +293,7 @@ end
         BSphere(SA[0., 0, 3], 0.4),
     ]
 
-    # Build the following IBVH from 5 bounding volumes:
+    # Build the following ImplicitBVH from 5 bounding volumes:
     #
     #         Nodes & Leaves                Tree Level
     #               1                       1
@@ -329,21 +328,21 @@ end
     bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:100])
 
     # Brute force contact detection
-    brute_contacts = IBVH.IndexPair[]
+    brute_contacts = ImplicitBVH.IndexPair[]
     for i in 1:length(bvs)
         for j in i + 1:length(bvs)
-            if IBVH.iscontact(bvs[i], bvs[j])
+            if ImplicitBVH.iscontact(bvs[i], bvs[j])
                 push!(brute_contacts, (i, j))
             end
         end
     end
 
-    # IBVH-based contact detection
+    # ImplicitBVH-based contact detection
     bvh = BVH(bvs, BBox{Float64})
     traversal = traverse(bvh)
     bvh_contacts = traversal.contacts
 
-    # Ensure IBVH finds same contacts as checking all possible pairs
+    # Ensure ImplicitBVH finds same contacts as checking all possible pairs
     @test length(brute_contacts) == length(bvh_contacts)
     for brute_contact in brute_contacts
         @test brute_contact in bvh_contacts

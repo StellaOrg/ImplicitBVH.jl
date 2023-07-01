@@ -1,4 +1,4 @@
-name = "IBVH"
+name = "ImplicitBVH"
 uuid = "932a18dc-bb55-4cd5-bdd6-1368ec9cea29"
 authors = ["Andrei Leonard Nicusan"]
 version = "0.2.0"

@@ -1,4 +1,4 @@
-# IBVH.jl Documentation
+# ImplicitBVH.jl Documentation
 
 
 ## BVH Construction & Traversal
@@ -11,8 +11,8 @@ traverse
 
 ```@docs
 BVHTraversal
-IBVH.BVHStats
-IBVH.IndexPair
+ImplicitBVH.BVHStats
+ImplicitBVH.IndexPair
 ```
 
 ## Index

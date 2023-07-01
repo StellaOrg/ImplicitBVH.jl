@@ -2,11 +2,11 @@
 
 
 ```@docs
-IBVH.MortonUnsigned
-IBVH.morton_encode
-IBVH.morton_encode!
-IBVH.morton_encode_single
-IBVH.morton_scaling
-IBVH.morton_split3
-IBVH.bounding_volumes_extrema
+ImplicitBVH.MortonUnsigned
+ImplicitBVH.morton_encode
+ImplicitBVH.morton_encode!
+ImplicitBVH.morton_encode_single
+ImplicitBVH.morton_scaling
+ImplicitBVH.morton_split3
+ImplicitBVH.bounding_volumes_extrema
 ```

@@ -1,5 +1,5 @@
 # Utilities
 
 ```@docs
-IBVH.TaskPartitioner
+ImplicitBVH.TaskPartitioner
 ```
