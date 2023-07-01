@@ -1,7 +1,7 @@
-[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://stellaorg.github.io/IBVH.jl/stable)
-[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://stellaorg.github.io/IBVH.jl/dev)
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/stable)
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/dev)
 
-# IBVH.jl
+# ImplicitBVH.jl
 *Fast, Robust Parallel Bounding Volume Hierarchy for Collision Detection in Dynamic Scenes*
 
 It uses an implicit bounding volume hierarchy constructed from an iterable of some geometric
@@ -21,8 +21,8 @@ detection downwards from this level.
 Simple usage with bounding spheres and default 64-bit types:
 
 ```julia
-using IBVH
-using IBVH: BBox, BSphere
+using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
 using StaticArrays
 
 # Generate some simple bounding spheres
@@ -49,8 +49,8 @@ Using `Float32` bounding spheres for leaves, `Float32` bounding boxes for nodes 
 Morton codes:
 
 ```julia
-using IBVH
-using IBVH: BBox, BSphere
+using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
 using StaticArrays
 
 # Generate some simple bounding spheres
@@ -86,7 +86,7 @@ Check out the `benchmark` folder for an example traversing an STL model.
 
 # Implicit Bounding Volume Hierarchy
 
-The main idea behind the IBVH is the use of an implicit perfect binary tree constructed from some
+The main idea behind the ImplicitBVH is the use of an implicit perfect binary tree constructed from some
 bounding volumes. If we had, say, 5 objects to construct the BVH from, it would form an incomplete
 binary tree as below:
 
@@ -118,4 +118,4 @@ The implicit tree formulation (genius idea!) which forms the core of the BVH str
 
 
 # License
-`IBVH.jl` is MIT-licensed. Enjoy.
+`ImplicitBVH.jl` is MIT-licensed. Enjoy.
