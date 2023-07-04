@@ -1,23 +1,6 @@
 """
     $(TYPEDEF)
 
-Collected statistics about a BVH construction and contact traversal; populated after calling
-[`traverse`](@ref).
-
-# Fields
-    $(TYPEDFIELDS)
-
-"""
-@with_kw mutable struct BVHStats
-    start_level::Union{Nothing, Int} = nothing
-    num_checks::Union{Nothing, Int} = nothing
-    num_contacts::Union{Nothing, Int} = nothing
-end
-
-
-"""
-    $(TYPEDEF)
-
 Implicit bounding volume hierarchy constructed from an iterable of some geometric primitives'
 (e.g. triangles in a mesh) bounding volumes forming the [`ImplicitTree`](@ref) leaves. The leaves
 and merged nodes above them can have different types - e.g. `BSphere{Float64}` for leaves
@@ -54,7 +37,6 @@ Tree Level          Nodes & Leaves               Build Up    Traverse Down
 - `leaves::VL <: AbstractVector`
 - `order::VO <: AbstractVector`
 - `built_level::Int`
-- `stats::`[`BVHStats`](@ref)
 
 
 # Examples
@@ -124,16 +106,30 @@ bvh = BVH(bounding_spheres, BBox{Float32}, UInt32, 2)
 traversal = traverse(bvh, 3, traversal)
 ```
 """
-@with_kw struct BVH{VN <: AbstractVector, VL <: AbstractVector, VO <: AbstractVector}
+struct BVH{VN <: AbstractVector, VL <: AbstractVector, VO <: AbstractVector}
+    built_level::Int
     tree::ImplicitTree{Int}
-
     nodes::VN
     leaves::VL
     order::VO
-
-    built_level::Int
-    stats::BVHStats=BVHStats()
 end
+
+
+# Custom pretty-printing
+function Base.show(io::IO, b::BVH{VN, VL, VO}) where {VN, VL, VO}
+    print(
+        io,
+        """
+        BVH
+          built_level: $(typeof(b.built_level)) $(b.built_level)
+          tree:        $(b.tree)
+          nodes:       $(VN)($(size(b.nodes)))
+          leaves:      $(VL)($(size(b.nodes)))
+          order:       $(VO)($(size(b.nodes)))
+        """
+    )
+end
+
 
 
 function BVH(
@@ -173,7 +169,7 @@ function BVH(
         aggregate_oibvh!(bvh_nodes, bounding_volumes, tree, order, built_level)
     end
 
-    BVH(tree, bvh_nodes, bounding_volumes, order, built_level, BVHStats())
+    BVH(built_level, tree, bvh_nodes, bounding_volumes, order)
 end
 
 

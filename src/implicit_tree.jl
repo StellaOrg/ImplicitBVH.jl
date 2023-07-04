@@ -49,7 +49,7 @@ julia> isvirtual(tree, 7)
 true
 ```
 """
-@with_kw struct ImplicitTree{T <: Integer}
+struct ImplicitTree{T <: Integer}
     "Number of levels in the tree."
     levels::T
 
@@ -65,6 +65,13 @@ true
     "Total number of virtual nodes in tree needed for a complete binary tree."
     virtual_nodes::T
 end
+
+
+# Custom print
+function Base.print(io::IO, t::ImplicitTree{T}) where {T}
+    print(io, "ImplicitTree{$T}(levels: $(t.levels), real_leaves: $(t.real_leaves))")
+end
+
 
 
 function ImplicitTree{T}(num_leaves::Integer) where {T <: Integer}

@@ -5,13 +5,7 @@
 ```@docs
 BVH
 traverse
-```
-
-### Other BVH Interfaces
-
-```@docs
 BVHTraversal
-ImplicitBVH.BVHStats
 ImplicitBVH.IndexPair
 ```
 

@@ -29,11 +29,10 @@ bounding_spheres = [LeafType(tri) for tri in mesh]
 
 # Pre-compile BVH traversal
 bvh = BVH(bounding_spheres, NodeType, MortonType)
-traversal = traverse(bvh)
-@show bvh.stats
+@show traversal = traverse(bvh)
 
 # Print algorithmic efficiency
-eff = bvh.stats.num_checks / (length(bounding_spheres) * length(bounding_spheres) / 2)
+eff = traversal.num_checks / (length(bounding_spheres) * length(bounding_spheres) / 2)
 println("Did $eff of the total checks needed for brute-force contact detection")
 
 # Benchmark BVH creation including Morton encoding
@@ -50,3 +49,20 @@ Profile.clear()
 
 # Export pprof profile and open interactive profiling web interface.
 pprof(; out="bvh_contact.pb.gz")
+
+
+# Test for some coding mistakes
+# using Test
+# Test.detect_unbound_args(ImplicitBVH, recursive = true)
+# Test.detect_ambiguities(ImplicitBVH, recursive = true)
+
+
+# More complete report on type stabilities
+# using JET
+# JET.@report_opt traverse(bvh)
+
+
+# using Profile
+# traverse(bvh, bvh.tree.levels ÷ 2, traversal)
+# Profile.clear_malloc_data()
+# traverse(bvh, bvh.tree.levels ÷ 2, traversal)

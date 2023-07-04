@@ -40,3 +40,20 @@ Profile.clear()
 
 # Export pprof profile and open interactive profiling web interface.
 pprof(; out="bvh_build.pb.gz")
+
+
+# Test for some coding mistakes
+# using Test
+# Test.detect_unbound_args(ImplicitBVH, recursive = true)
+# Test.detect_ambiguities(ImplicitBVH, recursive = true)
+
+
+# More complete report on type stabilities
+# using JET
+# JET.@report_opt BVH(bounding_spheres, NodeType, MortonType)
+
+
+# using Profile
+# BVH(bounding_spheres, NodeType, MortonType)
+# Profile.clear_malloc_data()
+# BVH(bounding_spheres, NodeType, MortonType)

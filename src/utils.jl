@@ -46,7 +46,7 @@ tp[i] = (16, 20)
 ```
 
 """
-@with_kw struct TaskPartitioner
+struct TaskPartitioner
     num_elems::Int
     max_tasks::Int
     min_elems::Int
