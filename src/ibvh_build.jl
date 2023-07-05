@@ -136,16 +136,11 @@ function BVH(
     bounding_volumes::AbstractVector{L},
     node_type::Type{N}=L,
     morton_type::Type{U}=UInt,
-    built_level::Integer=1,
+    built_level=1,
 ) where {L, N, U <: MortonUnsigned}
 
-    # Pre-compute shape of the implicit tree
-    numbv = length(bounding_volumes)
-    tree = ImplicitTree{Int}(numbv)
-
     # Ensure correctness
-    @assert 1 <= built_level <= tree.levels "built_level must be above leaf-level"
-    @assert firstindex(bounding_volumes) == 1 "vector types used must be 1-indexed"
+    @assert firstindex(bounding_volumes) == 1 "BVH vector types used must be 1-indexed"
 
     # Ensure efficiency
     isconcretetype(N) || @warn "node_type given as unsized type (e.g. BBox instead of \
@@ -154,11 +149,28 @@ function BVH(
     isconcretetype(L) || @warn "bounding_volumes given as unsized type (e.g. BBox instead of \
                                 BBox{Float64}) leading to non-inline vector storage"
 
+    # Pre-compute shape of the implicit tree
+    numbv = length(bounding_volumes)
+    tree = ImplicitTree{Int}(numbv)
+
+    # Compute level up to which tree should be built
+    if built_level isa Integer
+        @assert 1 <= built_level <= tree.levels
+        built_ilevel = Int(built_level)
+    elseif built_level isa AbstractFloat
+        @assert 0 <= built_level <= 1
+        built_ilevel = round(Int, tree.levels + (1 - tree.levels) * built_level)
+    else
+        throw(TypeError(:BVH, "built_level (the level to build BVH up to)",
+                        Union{Integer, AbstractFloat}, typeof(built_level)))
+    end
+
     # Compute morton codes for the bounding volumes
     mortons = similar(bounding_volumes, morton_type)
     @inbounds morton_encode!(mortons, bounding_volumes)
 
     # Compute indices that sort codes along the Z-curve - closer objects have closer Morton codes
+    # TODO: check parallel SyncSort or ThreadsX.QuickSort
     order = sortperm(mortons)
 
     # Pre-allocate vector of bounding volumes for the real nodes above the bottom level
@@ -166,10 +178,10 @@ function BVH(
 
     # Aggregate bounding volumes up to root
     if tree.real_nodes >= 2
-        aggregate_oibvh!(bvh_nodes, bounding_volumes, tree, order, built_level)
+        aggregate_oibvh!(bvh_nodes, bounding_volumes, tree, order, built_ilevel)
     end
 
-    BVH(built_level, tree, bvh_nodes, bounding_volumes, order)
+    BVH(built_ilevel, tree, bvh_nodes, bounding_volumes, order)
 end
 
 

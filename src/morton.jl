@@ -68,6 +68,18 @@ morton_scaling(::Type{UInt64}) = 2^21
 
 
 """
+    relative_precision(::Type{Float16}) = 1e-2
+    relative_precision(::Type{Float32}) = 1e-5
+    relative_precision(::Type{Float64}) = 1e-14
+
+Relative precision value for floating-point types.
+"""
+relative_precision(::Type{Float16}) = Float16(1e-2)
+relative_precision(::Type{Float32}) = Float32(1e-5)
+relative_precision(::Type{Float64}) = Float64(1e-14)
+
+
+"""
     morton_encode_single(centre, mins, maxs, U::MortonUnsignedType=UInt32)
 
 Return Morton code for a single 3D position `centre` scaled uniformly between `mins` and `maxs`.
@@ -103,7 +115,6 @@ function morton_encode_range!(
 end
 
 
-
 """
     bounding_volumes_extrema(bounding_volumes)
 
@@ -130,13 +141,13 @@ function bounding_volumes_extrema(bounding_volumes)
     # Expand extrema by float precision to ensure morton codes are exclusively bounded by them
     T = typeof(xmin)
 
-    xmin = xmin - T(1e-5) * abs(xmin) - floatmin(T)
-    ymin = ymin - T(1e-5) * abs(ymin) - floatmin(T)
-    zmin = zmin - T(1e-5) * abs(zmin) - floatmin(T)
+    xmin = xmin - relative_precision(T) * abs(xmin) - floatmin(T)
+    ymin = ymin - relative_precision(T) * abs(ymin) - floatmin(T)
+    zmin = zmin - relative_precision(T) * abs(zmin) - floatmin(T)
 
-    xmax = xmax + T(1e-5) * abs(xmax) + floatmin(T)
-    ymax = ymax + T(1e-5) * abs(ymax) + floatmin(T)
-    zmax = zmax + T(1e-5) * abs(zmax) + floatmin(T)
+    xmax = xmax + relative_precision(T) * abs(xmax) + floatmin(T)
+    ymax = ymax + relative_precision(T) * abs(ymax) + floatmin(T)
+    zmax = zmax + relative_precision(T) * abs(zmax) + floatmin(T)
 
     (xmin, ymin, zmin), (xmax, ymax, zmax)
 end
@@ -162,16 +173,8 @@ function morton_encode!(
 
     # Bounds checking
     @assert firstindex(mortons) == firstindex(bounding_volumes) == 1
-    @boundscheck begin
-        @assert length(mortons) == length(bounding_volumes)
-        @assert length(mins) == length(maxs) == 3
-        for bv in bounding_volumes
-            bounding_volume_center = center(bv)
-            @assert mins[1] < bounding_volume_center[1] < maxs[1]
-            @assert mins[2] < bounding_volume_center[2] < maxs[2]
-            @assert mins[3] < bounding_volume_center[3] < maxs[3]
-        end
-    end
+    @assert length(mortons) == length(bounding_volumes)
+    @assert length(mins) == length(maxs) == 3
 
     # Trivial case
     length(bounding_volumes) == 0 && return nothing
@@ -179,7 +182,7 @@ function morton_encode!(
     # Encode bounding volumes' centres across multiple threads using contiguous ranges
     tp = TaskPartitioner(length(bounding_volumes), Threads.nthreads(), 1000)
     if tp.num_tasks == 1
-        @inbounds morton_encode_range!(
+        morton_encode_range!(
             mortons, bounding_volumes,
             mins, maxs,
             (firstindex(bounding_volumes), lastindex(bounding_volumes)),

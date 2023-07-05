@@ -148,7 +148,7 @@ function traverse(
 end
 
 
-@inline function initial_bvtt(bvh, start_level, cache)
+function initial_bvtt(bvh, start_level, cache)
     # Generate all possible contact checks for the given start_level to avoid the very little
     # work to do at the top
     level_nodes = 2^(start_level - 1)
@@ -267,13 +267,11 @@ function traverse_nodes_atomic!(bvh, src, dst, num_src, self_checks=true)
     if tp.num_tasks == 1
         num_dst = traverse_nodes_atomic_range!(
             bvh,
-            src, view(dst, :), nothing,
+            src, dst, nothing,
             self_checks,
             (1, num_src),
         )
     else
-        num_dst = 0
-
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 4 dst elements per src element
         tasks = Vector{Task}(undef, tp.num_tasks)
@@ -287,6 +285,9 @@ function traverse_nodes_atomic!(bvh, src, dst, num_src, self_checks=true)
                 (istart, iend),
             )
         end
+
+        # As tasks finish sequentially, move the new written contacts into contiguous region
+        num_dst = 0
         @inbounds for i in 1:tp.num_tasks
             wait(tasks[i])
             task_num_written = num_written[i]
@@ -307,7 +308,7 @@ end
 
 
 
-@inline function traverse_leaves_atomic_range!(
+function traverse_leaves_atomic_range!(
     bvh, src, contacts, num_written, irange
 )
     # Check src[irange[1]:irange[2]] and write to dst[1:num_dst]; dst should be given as a view

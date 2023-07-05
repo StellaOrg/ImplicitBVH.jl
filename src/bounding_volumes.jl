@@ -6,6 +6,7 @@ end
 
 
 # Adapted from https://realtimecollisiondetection.net/blog/?p=20
+# TODO: for Float16 we currently get NaNs
 function BSphere{T}(p1, p2, p3) where {T <: Real}
 
     # Convert to SVectors of the requested type; code will be unrolled and heavily vectorized

@@ -201,33 +201,104 @@ end
 @testset "test_morton" begin
 
     # Single numbers
-    x = UInt32(0x111)
+    x = UInt16(0b111)
     m = ImplicitBVH.morton_split3(x)
-    @test m == 0x1001001
+    @test m == 0b1001001
 
-    x = UInt64(0x111)
+    x = UInt32(0b111)
     m = ImplicitBVH.morton_split3(x)
-    @test m == 0x1001001
+    @test m == 0b1001001
+
+    x = UInt64(0b111)
+    m = ImplicitBVH.morton_split3(x)
+    @test m == 0b1001001
 
     # Random bounding volumes
     Random.seed!(42)
 
+    # Extrema computed at different precisions
+    #
+    # TODO: BSphere{Float16} returns NaNs
+    # bv = map(BSphere{Float16}, [100 .* rand(3, 3) for _ in 1:100])
+    # display(bv)
+    # mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
+    # @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
+    # @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
+    # @test all([ImplicitBVH.center(b)[3] > mins[3] for b in bv])
+    # @test all([ImplicitBVH.center(b)[1] < maxs[1] for b in bv])
+    # @test all([ImplicitBVH.center(b)[2] < maxs[2] for b in bv])
+    # @test all([ImplicitBVH.center(b)[3] < maxs[3] for b in bv])
+
+    bv = map(BSphere{Float32}, [1000 .* rand(3, 3) for _ in 1:100])
+    mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
+    @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
+    @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
+    @test all([ImplicitBVH.center(b)[3] > mins[3] for b in bv])
+    @test all([ImplicitBVH.center(b)[1] < maxs[1] for b in bv])
+    @test all([ImplicitBVH.center(b)[2] < maxs[2] for b in bv])
+    @test all([ImplicitBVH.center(b)[3] < maxs[3] for b in bv])
+
+    bv = map(BSphere{Float64}, [1000 .* rand(3, 3) for _ in 1:100])
+    mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
+    @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
+    @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
+    @test all([ImplicitBVH.center(b)[3] > mins[3] for b in bv])
+    @test all([ImplicitBVH.center(b)[1] < maxs[1] for b in bv])
+    @test all([ImplicitBVH.center(b)[2] < maxs[2] for b in bv])
+    @test all([ImplicitBVH.center(b)[3] < maxs[3] for b in bv])
+
+    # Extrema computed for degenerate inputs
+    bv = [BSphere(SA[0., 0, 0], 1.)]
+    mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
+    @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
+    @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
+    @test all([ImplicitBVH.center(b)[3] > mins[3] for b in bv])
+    @test all([ImplicitBVH.center(b)[1] < maxs[1] for b in bv])
+    @test all([ImplicitBVH.center(b)[2] < maxs[2] for b in bv])
+    @test all([ImplicitBVH.center(b)[3] < maxs[3] for b in bv])
+
+    bv = [BSphere(SA[1000., 0, 0], 1.), BSphere(SA[1000., 0, 0], 1.)]
+    mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
+    @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
+    @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
+    @test all([ImplicitBVH.center(b)[3] > mins[3] for b in bv])
+    @test all([ImplicitBVH.center(b)[1] < maxs[1] for b in bv])
+    @test all([ImplicitBVH.center(b)[2] < maxs[2] for b in bv])
+    @test all([ImplicitBVH.center(b)[3] < maxs[3] for b in bv])
+
+    # Different morton code sizes
     bv = map(BSphere, [rand(3, 3) for _ in 1:10])
+    ImplicitBVH.morton_encode(bv, UInt16)
     ImplicitBVH.morton_encode(bv, UInt32)
     ImplicitBVH.morton_encode(bv, UInt64)
     ImplicitBVH.morton_encode(bv)
 
     bv = map(BBox, [rand(3, 3) for _ in 1:10])
+    ImplicitBVH.morton_encode(bv, UInt16)
+    ImplicitBVH.morton_encode(bv, UInt32)
+    ImplicitBVH.morton_encode(bv, UInt64)
+    ImplicitBVH.morton_encode(bv)
+
+    bv = map(BSphere{Float16}, [rand(3, 3) for _ in 1:10])
+    ImplicitBVH.morton_encode(bv, UInt16)
+    ImplicitBVH.morton_encode(bv, UInt32)
+    ImplicitBVH.morton_encode(bv, UInt64)
+    ImplicitBVH.morton_encode(bv)
+
+    bv = map(BBox{Float16}, [rand(3, 3) for _ in 1:10])
+    ImplicitBVH.morton_encode(bv, UInt16)
     ImplicitBVH.morton_encode(bv, UInt32)
     ImplicitBVH.morton_encode(bv, UInt64)
     ImplicitBVH.morton_encode(bv)
 
     bv = map(BSphere{Float32}, [rand(3, 3) for _ in 1:10])
+    ImplicitBVH.morton_encode(bv, UInt16)
     ImplicitBVH.morton_encode(bv, UInt32)
     ImplicitBVH.morton_encode(bv, UInt64)
     ImplicitBVH.morton_encode(bv)
 
     bv = map(BBox{Float32}, [rand(3, 3) for _ in 1:10])
+    ImplicitBVH.morton_encode(bv, UInt16)
     ImplicitBVH.morton_encode(bv, UInt32)
     ImplicitBVH.morton_encode(bv, UInt64)
     ImplicitBVH.morton_encode(bv)
@@ -353,6 +424,9 @@ end
     BVH(bvs, BBox{Float64})
     BVH(bvs, BBox{Float64}, UInt32)
     BVH(bvs, BBox{Float64}, UInt32, 3)
+    BVH(bvs, BBox{Float64}, UInt32, 0.0)
+    BVH(bvs, BBox{Float64}, UInt32, 0.5)
+    BVH(bvs, BBox{Float64}, UInt32, 1.0)
 
     traverse(bvh, 3)
     traverse(bvh, 3, traversal)
