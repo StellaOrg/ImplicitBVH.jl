@@ -303,14 +303,14 @@ end
     bv = map(BSphere{Float16}, [rand(3, 3) for _ in 1:10])
     ImplicitBVH.morton_encode(bv, UInt16)
     ImplicitBVH.morton_encode(bv, UInt32)
-    ImplicitBVH.morton_encode(bv, UInt64)
-    ImplicitBVH.morton_encode(bv)
+    # ImplicitBVH.morton_encode(bv, UInt64)     # Range of UInt64 is too high compared to Float16
+    # ImplicitBVH.morton_encode(bv)
 
     bv = map(BBox{Float16}, [rand(3, 3) for _ in 1:10])
     ImplicitBVH.morton_encode(bv, UInt16)
     ImplicitBVH.morton_encode(bv, UInt32)
-    ImplicitBVH.morton_encode(bv, UInt64)
-    ImplicitBVH.morton_encode(bv)
+    # ImplicitBVH.morton_encode(bv, UInt64)     # Range of UInt64 is too high compared to Float16
+    # ImplicitBVH.morton_encode(bv)
 
     bv = map(BSphere{Float32}, [rand(3, 3) for _ in 1:10])
     ImplicitBVH.morton_encode(bv, UInt16)
