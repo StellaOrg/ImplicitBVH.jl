@@ -23,20 +23,23 @@ Bounding sphere, highly optimised for computing bounding volumes for triangles a
 larger bounding volumes.
 
 # Methods
+    # Convenience constructors
     BSphere(x::NTuple{3, T}, r)
     BSphere{T}(x::AbstractVector, r) where T
     BSphere(x::AbstractVector, r)
+
+    # Construct from triangle vertices
     BSphere{T}(p1, p2, p3) where T
     BSphere(p1, p2, p3)
     BSphere{T}(vertices::AbstractMatrix) where T
     BSphere(vertices::AbstractMatrix)
     BSphere{T}(triangle) where T
     BSphere(triangle)
+
+    # Merging bounding volumes
     BSphere{T}(a::BSphere, b::BSphere) where T
     BSphere(a::BSphere{T}, b::BSphere{T}) where T
     Base.:+(a::BSphere, b::BSphere)
-    center(b::BSphere)
-    iscontact(a::BSphere, b::BSphere)
 """
 struct BSphere{T}
     x::NTuple{3, T}
@@ -195,24 +198,29 @@ Can also be constructed from two spheres to e.g. allow merging [`BSphere`](@ref)
 [`BBox`](@ref) nodes.
 
 # Methods
+    # Convenience constructors
     BBox(lo::NTuple{3, T}, up::NTuple{3, T}) where T
     BBox{T}(lo::AbstractVector, up::AbstractVector) where T
     BBox(lo::AbstractVector, up::AbstractVector)
+
+    # Construct from triangle vertices
     BBox{T}(p1, p2, p3) where T
     BBox(p1, p2, p3)
-    BBox{T}(triangle) where T
-    BBox(triangle)
     BBox{T}(vertices::AbstractMatrix) where T
     BBox(vertices::AbstractMatrix)
+    BBox{T}(triangle) where T
+    BBox(triangle)
+
+    # Merging bounding boxes
     BBox{T}(a::BBox, b::BBox) where T
     BBox(a::BBox{T}, b::BBox{T}) where T
     Base.:+(a::BBox, b::BBox)
+
+    # Merging bounding spheres
     BBox{T}(a::BSphere{T}) where T
     BBox(a::BSphere{T}) where T
     BBox{T}(a::BSphere{T}, b::BSphere{T}) where T
     BBox(a::BSphere{T}, b::BSphere{T}) where T
-    center(b::BBox{T}) where T
-    iscontact(a::BBox, b::BBox)
 """
 struct BBox{T}
     lo::NTuple{3, T}
