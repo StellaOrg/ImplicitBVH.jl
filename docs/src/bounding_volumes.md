@@ -10,7 +10,4 @@ ImplicitBVH.BSphere
 ```@docs
 ImplicitBVH.iscontact
 ImplicitBVH.center
-ImplicitBVH.radius
-ImplicitBVH.lower
-ImplicitBVH.upper
 ```

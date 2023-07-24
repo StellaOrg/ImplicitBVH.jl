@@ -46,15 +46,14 @@ Simple usage with bounding spheres and default 64-bit types:
 ```jldoctest
 using ImplicitBVH
 using ImplicitBVH: BSphere
-using StaticArrays
 
 # Generate some simple bounding spheres
 bounding_spheres = [
-    BSphere(SA[0., 0., 0.], 0.5),
-    BSphere(SA[0., 0., 1.], 0.6),
-    BSphere(SA[0., 0., 2.], 0.5),
-    BSphere(SA[0., 0., 3.], 0.4),
-    BSphere(SA[0., 0., 4.], 0.6),
+    BSphere([0., 0., 0.], 0.5),
+    BSphere([0., 0., 1.], 0.6),
+    BSphere([0., 0., 2.], 0.5),
+    BSphere([0., 0., 3.], 0.4),
+    BSphere([0., 0., 4.], 0.6),
 ]
 
 # Build BVH
@@ -75,15 +74,14 @@ Morton codes:
 ```jldoctest
 using ImplicitBVH
 using ImplicitBVH: BBox, BSphere
-using StaticArrays
 
 # Generate some simple bounding spheres
 bounding_spheres = [
-    BSphere{Float32}(SA[0., 0., 0.], 0.5),
-    BSphere{Float32}(SA[0., 0., 1.], 0.6),
-    BSphere{Float32}(SA[0., 0., 2.], 0.5),
-    BSphere{Float32}(SA[0., 0., 3.], 0.4),
-    BSphere{Float32}(SA[0., 0., 4.], 0.6),
+    BSphere{Float32}([0., 0., 0.], 0.5),
+    BSphere{Float32}([0., 0., 1.], 0.6),
+    BSphere{Float32}([0., 0., 2.], 0.5),
+    BSphere{Float32}([0., 0., 3.], 0.4),
+    BSphere{Float32}([0., 0., 4.], 0.6),
 ]
 
 # Build BVH

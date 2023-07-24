@@ -1,78 +1,131 @@
-# Bounding sphere
-struct BSphere{T <: Real}
-    x::SVector{3, T}
+"""
+    iscontact(a::BSphere, b::BSphere)
+    iscontact(a::BBox, b::BBox)
+
+Check if two bounding volumes are touching or inter-penetrating.
+"""
+function iscontact end
+
+
+"""
+    center(b::BSphere)
+    center(b::BBox{T}) where T
+
+Get the coordinates of a bounding volume's centre, as a NTuple{3, T}.
+"""
+function center end
+
+
+"""
+    $(TYPEDEF)
+
+Bounding sphere, highly optimised for computing bounding volumes for triangles and merging into
+larger bounding volumes.
+
+# Methods
+    BSphere(x::NTuple{3, T}, r)
+    BSphere{T}(x::AbstractVector, r) where T
+    BSphere(x::AbstractVector, r)
+    BSphere{T}(p1, p2, p3) where T
+    BSphere(p1, p2, p3)
+    BSphere{T}(vertices::AbstractMatrix) where T
+    BSphere(vertices::AbstractMatrix)
+    BSphere{T}(triangle) where T
+    BSphere(triangle)
+    BSphere{T}(a::BSphere, b::BSphere) where T
+    BSphere(a::BSphere{T}, b::BSphere{T}) where T
+    Base.:+(a::BSphere, b::BSphere)
+    center(b::BSphere)
+    iscontact(a::BSphere, b::BSphere)
+"""
+struct BSphere{T}
+    x::NTuple{3, T}
     r::T
 end
 
 
-# Adapted from https://realtimecollisiondetection.net/blog/?p=20
-# TODO: for Float16 we currently get NaNs
-function BSphere{T}(p1, p2, p3) where {T <: Real}
+# Convenience constructors, with and without type parameter
+BSphere{T}(x::AbstractVector, r) where T = BSphere(NTuple{3, T}(x), T(r))
+BSphere(x::AbstractVector, r) = BSphere{eltype(x)}(x, r)
 
-    # Convert to SVectors of the requested type; code will be unrolled and heavily vectorized
-    a = SVector{3, T}(p1)
-    b = SVector{3, T}(p2)
-    c = SVector{3, T}(p3)
 
-    abab = T(dot(b - a, b - a))
-    abac = T(dot(b - a, c - a))
-    acac = T(dot(c - a, c - a))
+# Constructors from triangles
+function BSphere{T}(p1, p2, p3) where T
+
+    # Adapted from https://realtimecollisiondetection.net/blog/?p=20
+    a = (T(p1[1]), T(p1[2]), T(p1[3]))
+    b = (T(p2[1]), T(p2[2]), T(p2[3]))
+    c = (T(p3[1]), T(p3[2]), T(p3[3]))
+
+    # Unrolled dot(b - a, b - a)
+    abab = (b[1] - a[1]) * (b[1] - a[1]) +
+           (b[2] - a[2]) * (b[2] - a[2]) +
+           (b[3] - a[3]) * (b[3] - a[3])
+
+    # Unrolled dot(b - a, c - a)
+    abac = (b[1] - a[1]) * (c[1] - a[1]) +
+           (b[2] - a[2]) * (c[2] - a[2]) +
+           (b[3] - a[3]) * (c[3] - a[3])
+
+    # Unrolled dot(c - a, c - a)
+    acac = (c[1] - a[1]) * (c[1] - a[1]) +
+           (c[2] - a[2]) * (c[2] - a[2]) +
+           (c[3] - a[3]) * (c[3] - a[3])
 
     d = T(2.) * (abab * acac - abac * abac)
 
     # Declaring bounding sphere centre and radius
-    centre = SVector{3, T}(a)
-    radius = zero(T)
-
-    if d^2 <= T(1e-5) * sum(dot(centre, centre))
+    if abs(d) <= eps(T)
         # a, b, c lie on a line. Find line centre and radius
-        lower = MVector{3}(a)
-        upper = MVector{3}(a)
+        lower = (minimum3(a[1], b[1], c[1]),
+                 minimum3(a[2], b[2], c[2]),
+                 minimum3(a[3], b[3], c[3]))
 
-        # This will all be unrolled and vectorized
-        for current in (b, c)
-            for i in 1:3
-                if current[i] < lower[i]
-                    lower[i] = current[i]
-                end
+        upper = (maximum3(a[1], b[1], c[1]),
+                 maximum3(a[2], b[2], c[2]),
+                 maximum3(a[3], b[3], c[3]))
 
-                if current[i] > upper[i]
-                    upper[i] = current[i]
-                end
-            end
-        end
-
-        centre = SVector{3}(T(0.5) * (lower + upper))
-        radius = norm(upper - centre)
+        centre = (T(0.5) * (lower[1] + upper[1]),
+                  T(0.5) * (lower[2] + upper[2]),
+                  T(0.5) * (lower[3] + upper[3]))
+        radius = dist3(centre, upper)
     else
         s = (abab * acac - acac * abac) / d
         t = (acac * abab - abab * abac) / d
 
         if s <= zero(T)
-            centre = T(0.5) * (a + c)
-            radius = norm(centre - a)
+            centre = (T(0.5) * (a[1] + c[1]),
+                      T(0.5) * (a[2] + c[2]),
+                      T(0.5) * (a[3] + c[3]))
+            radius = dist3(centre, a)
         elseif t <= zero(T)
-            centre = T(0.5) * (a + b)
-            radius = norm(centre - a)
+            centre = (T(0.5) * (a[1] + b[1]),
+                      T(0.5) * (a[2] + b[2]),
+                      T(0.5) * (a[3] + b[3]))
+            radius = dist3(centre, a)
         elseif s + t >= one(T)
-            centre = T(0.5) * (b + c)
-            radius = norm(centre - b)
+            centre = (T(0.5) * (b[1] + c[1]),
+                      T(0.5) * (b[2] + c[2]),
+                      T(0.5) * (b[3] + c[3]))
+            radius = dist3(centre, b)
         else
-            centre = a + s * (b - a) + t * (c - a)
-            radius = norm(centre - a)
+            centre = (a[1] + s * (b[1] - a[1]) + t * (c[1] - a[1]),
+                      a[2] + s * (b[2] - a[2]) + t * (c[2] - a[2]),
+                      a[3] + s * (b[3] - a[3]) + t * (c[3] - a[3]))
+            radius = dist3(centre, a)
         end
     end
 
-    BSphere(SVector{3, T}(centre), T(radius))
+    BSphere(centre, radius)
 end
 
 
-# Convenience constructors
+# Convenience constructors, with and without explicit type parameter
 function BSphere(p1, p2, p3)
     BSphere{eltype(p1)}(p1, p2, p3)
 end
 
-function BSphere{T}(triangle) where {T <: Real}
+function BSphere{T}(triangle) where T
     # Decompose triangle into its 3 vertices.
     # Works transparently with GeometryBasics.Triangle, Vector{SVector{3, T}}, etc.
     p1, p2, p3 = triangle
@@ -84,7 +137,7 @@ function BSphere(triangle)
     BSphere{eltype(p1)}(p1, p2, p3)
 end
 
-function BSphere{T}(vertices::AbstractMatrix) where {T <: Real}
+function BSphere{T}(vertices::AbstractMatrix) where T
     BSphere{T}(@view(vertices[:, 1]), @view(vertices[:, 2]), @view(vertices[:, 3]))
 end
 
@@ -93,95 +146,112 @@ function BSphere(vertices::AbstractMatrix)
 end
 
 
-# Ensure consistent interfaces
-Base.eltype(::BSphere{T}) where {T <: Real} = T
-Base.eltype(::Type{BSphere{T}}) where {T <: Real} = T
-
+# Overloaded center function
 center(b::BSphere) = b.x
-radius(b::BSphere) = b.r
-lower(b::BSphere) = b.x .- b.r
-upper(b::BSphere) = b.x .+ b.r
 
 
 # Merge two bounding spheres
-function Base.:+(a::BSphere, b::BSphere)
-    relative = b.x - a.x
-    length = norm(relative)
-    direction = relative / length
+function BSphere{T}(a::BSphere, b::BSphere) where T
+    length = dist3(a.x, b.x)
 
     # a is enclosed within b
     if length + a.r <= b.r
-        centre = b.x
-        radius = b.r
+        return BSphere{T}(b.x, b.r)
 
     # b is enclosed within a
     elseif length + b.r <= a.r
-        centre = a.x
-        radius = a.r
+        return BSphere{T}(a.x, a.r)
 
     # Bounding spheres are not enclosed
     else
-        lower = a.x - a.r * direction
-        upper = b.x + b.r * direction
-
-        centre = lower + (upper - lower) / 2
-        radius = (a.r + length + b.r) / 2
+        centre = (T(0.5) * (a.x[1] + b.x[1]),
+                  T(0.5) * (a.x[2] + b.x[2]),
+                  T(0.5) * (a.x[3] + b.x[3]))
+        radius = T(0.5) * (length + a.r + b.r)
+        return BSphere{T}(centre, radius)
     end
-
-    BSphere(centre, radius)
 end
+
+
+BSphere(a::BSphere{T}, b::BSphere{T}) where T = BSphere{T}(a, b)
+Base.:+(a::BSphere, b::BSphere) = BSphere(a, b)
 
 
 # Contact detection
 function iscontact(a::BSphere, b::BSphere)
-    (b.x[1] - a.x[1]) * (b.x[1] - a.x[1]) +
-    (b.x[2] - a.x[2]) * (b.x[2] - a.x[2]) +
-    (b.x[3] - a.x[3]) * (b.x[3] - a.x[3]) <=
-    (a.r + b.r) * (a.r + b.r)
+    dist23(a.x, b.x) <= (a.r + b.r) * (a.r + b.r)
 end
 
 
 
 
-# Bounding box
-struct BBox{T <: Real}
-    lo::SVector{3, T}
-    up::SVector{3, T}
+"""
+    $(TYPEDEF)
+
+Axis-aligned bounding box, highly optimised for computing bounding volumes for triangles and
+merging into larger bounding volumes.
+
+Can also be constructed from two spheres to e.g. allow merging [`BSphere`](@ref) leaves into
+[`BBox`](@ref) nodes.
+
+# Methods
+    BBox(lo::NTuple{3, T}, up::NTuple{3, T}) where T
+    BBox{T}(lo::AbstractVector, up::AbstractVector) where T
+    BBox(lo::AbstractVector, up::AbstractVector)
+    BBox{T}(p1, p2, p3) where T
+    BBox(p1, p2, p3)
+    BBox{T}(triangle) where T
+    BBox(triangle)
+    BBox{T}(vertices::AbstractMatrix) where T
+    BBox(vertices::AbstractMatrix)
+    BBox{T}(a::BBox, b::BBox) where T
+    BBox(a::BBox{T}, b::BBox{T}) where T
+    Base.:+(a::BBox, b::BBox)
+    BBox{T}(a::BSphere{T}) where T
+    BBox(a::BSphere{T}) where T
+    BBox{T}(a::BSphere{T}, b::BSphere{T}) where T
+    BBox(a::BSphere{T}, b::BSphere{T}) where T
+    center(b::BBox{T}) where T
+    iscontact(a::BBox, b::BBox)
+"""
+struct BBox{T}
+    lo::NTuple{3, T}
+    up::NTuple{3, T}
 end
 
 
-function BBox{T}(p1, p2, p3) where {T <: Real}
+# Convenience constructors, with and without type parameter
+function BBox{T}(lo::AbstractVector, up::AbstractVector) where T
+    BBox(NTuple{3, eltype(lo)}(lo), NTuple{3, eltype(up)}(up))
+end
 
-    # Convert to SVectors of the requested type; code will be unrolled and heavily vectorized
-    lower = MVector{3, T}(p1)
-    upper = MVector{3, T}(p1)
+function BBox(lo::AbstractVector, up::AbstractVector)
+    BBox{eltype(lo)}(lo, up)
+end
 
-    b = SVector{3, T}(p2)
-    c = SVector{3, T}(p3)
 
-    # This will all be unrolled and vectorized
-    for current in (b, c)
-        for i in 1:3
-            if current[i] < lower[i]
-                lower[i] = current[i]
-            end
 
-            if current[i] > upper[i]
-                upper[i] = current[i]
-            end
-        end
-    end
+# Constructors from triangles
+function BBox{T}(p1, p2, p3) where T
+
+    lower = (minimum3(p1[1], p2[1], p3[1]),
+             minimum3(p1[2], p2[2], p3[2]),
+             minimum3(p1[3], p2[3], p3[3]))
+
+    upper = (maximum3(p1[1], p2[1], p3[1]),
+             maximum3(p1[2], p2[2], p3[2]),
+             maximum3(p1[3], p2[3], p3[3]))
    
-    BBox{T}(SVector{3, T}(lower), SVector{3, T}(upper))
+    BBox{T}(lower, upper)
 end
 
 
-# Convenience constructors
+# Convenience constructors, with and without explicit type parameter
 function BBox(p1, p2, p3)
     BBox{eltype(p1)}(p1, p2, p3)
 end
 
-function BBox{T}(triangle) where {T <: Real}
+function BBox{T}(triangle) where T
     # Decompose triangle into its 3 vertices.
     # Works transparently with GeometryBasics.Triangle, Vector{SVector{3, T}}, etc.
     p1, p2, p3 = triangle
@@ -193,7 +263,7 @@ function BBox(triangle)
     BBox{eltype(p1)}(p1, p2, p3)
 end
 
-function BBox{T}(vertices::AbstractMatrix) where {T <: Real}
+function BBox{T}(vertices::AbstractMatrix) where T
     BBox{T}(@view(vertices[:, 1]), @view(vertices[:, 2]), @view(vertices[:, 3]))
 end
 
@@ -202,83 +272,68 @@ function BBox(vertices::AbstractMatrix)
 end
 
 
-# Construct BBox from BSphere
-function BBox{T}(a::BSphere{T}) where {T <: Real}
-    BBox(a.x .- a.r, a.x .+ a.r)
-end
-
-function BBox(a::BSphere{T}) where {T <: Real}
-    BBox{T}(a)
-end
-
-function BBox{T}(a::BSphere{T}, b::BSphere{T}) where {T <: Real}
-    relative = b.x - a.x
-    length = norm(relative)
-    direction = relative / length
-
-    # a is enclosed within b
-    if length + a.r <= b.r
-        lo = b.x .- b.r
-        up = b.x .+ b.r
-
-    # b is enclosed within a
-    elseif length + b.r <= a.r
-        lo = a.x .- a.r
-        up = a.x .+ a.r
-
-    # Bounding spheres are not enclosed
-    else
-        lo = SVector{3, T}(
-            min(a.x[1] - a.r, b.x[1] - b.r),
-            min(a.x[2] - a.r, b.x[2] - b.r),
-            min(a.x[3] - a.r, b.x[3] - b.r),
-        )
-
-        up = SVector{3, T}(
-            max(a.x[1] + a.r, b.x[1] + b.r),
-            max(a.x[2] + a.r, b.x[2] + b.r),
-            max(a.x[3] + a.r, b.x[3] + b.r),
-        )
-    end
-
-    BBox(lo, up)
-end
-
-function BBox(a::BSphere{T}, b::BSphere{T}) where {T <: Real}
-    BBox{T}(a, b)
-end
-
-
-# Ensure consistent interfaces
-Base.eltype(::BBox{T}) where {T <: Real} = T
-Base.eltype(::Type{BBox{T}}) where {T <: Real} = T
-
-center(b::BBox) = (b.lo + b.up) / 2
-radius(b::BBox) = (b.up - b.lo) / 2
-lower(b::BBox) = b.lo
-upper(b::BBox) = b.up
+# Overloaded center function
+center(b::BBox{T}) where T = (T(0.5) * (b.lo[1] + b.up[1]),
+                              T(0.5) * (b.lo[2] + b.up[2]),
+                              T(0.5) * (b.lo[3] + b.up[3]))
 
 
 # Merge two bounding boxes
-function Base.:+(a::BBox, b::BBox)
+function BBox{T}(a::BBox, b::BBox) where T
+    lower = (minimum2(a.lo[1], b.lo[1]),
+             minimum2(a.lo[2], b.lo[2]),
+             minimum2(a.lo[3], b.lo[3]))
 
-    lower = MVector{3}(a.lo)
-    upper = MVector{3}(b.up)
+    upper = (maximum2(a.up[1], b.up[1]),
+             maximum2(a.up[2], b.up[2]),
+             maximum2(a.up[3], b.up[3]))
 
-    # This will be unrolled and vectorized
-    for current in (a, b)
-        for i in 1:3
-            if current.lo[i] < lower[i]
-                lower[i] = current.lo[i]
-            end
+    BBox{T}(lower, upper)
+end
 
-            if current.up[i] > upper[i]
-                upper[i] = current.up[i]
-            end
-        end
+BBox(a::BBox{T}, b::BBox{T}) where T = BBox{T}(a, b)
+Base.:+(a::BBox, b::BBox) = BBox(a, b)
+
+
+# Convert BSphere to BBox
+function BBox{T}(a::BSphere{T}) where T
+    lower = (a.x[1] - a.r, a.x[2] - a.r, a.x[3] - a.r)
+    upper = (a.x[1] + a.r, a.x[2] + a.r, a.x[3] + a.r)
+    BBox(lower, upper)
+end
+
+function BBox(a::BSphere{T}) where T
+    BBox{T}(a)
+end
+
+# Merge two BSphere into enclosing BBox
+function BBox{T}(a::BSphere{T}, b::BSphere{T}) where T
+    length = dist3(a.x, b.x)
+
+    # a is enclosed within b
+    if length + a.r <= b.r
+        return BBox(b)
+
+    # b is enclosed within a
+    elseif length + b.r <= a.r
+        return BBox(a)
+
+    # Bounding spheres are not enclosed
+    else
+        lower = (minimum2(a.x[1] - a.r, b.x[1] - b.r),
+                 minimum2(a.x[2] - a.r, b.x[2] - b.r),
+                 minimum2(a.x[3] - a.r, b.x[3] - b.r))
+
+        upper = (maximum2(a.x[1] + a.r, b.x[1] + b.r),
+                 maximum2(a.x[2] + a.r, b.x[2] + b.r),
+                 maximum2(a.x[3] + a.r, b.x[3] + b.r))
+
+        return BBox(lower, upper)
     end
+end
 
-    BBox(SVector{3}(lower), SVector{3}(upper))
+function BBox(a::BSphere{T}, b::BSphere{T}) where T
+    BBox{T}(a, b)
 end
 
 

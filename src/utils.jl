@@ -102,3 +102,27 @@ end
     @boundscheck n > zero(T) || throw(DomainError(n))
     msbindex(T) - leading_zeros(n)
 end
+
+
+
+
+# Specialised maths functions
+function dot3(x, y)
+    x[1] * y[1] + x[2] * y[2] + x[3] * y[3]
+end
+
+
+function dist23(x, y)
+    (x[1] - y[1]) * (x[1] - y[1]) +
+    (x[2] - y[2]) * (x[2] - y[2]) +
+    (x[3] - y[3]) * (x[3] - y[3])
+end
+
+
+dist3(x, y) = sqrt(dist23(x, y))
+
+minimum2(a, b) = a < b ? a : b
+minimum3(a, b, c) = a < b ? minimum2(a, c) : minimum2(b, c)
+
+maximum2(a, b) = a > b ? a : b
+maximum3(a, b, c) = a > b ? maximum2(a, c) : maximum2(b, c)

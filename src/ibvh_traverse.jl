@@ -77,15 +77,14 @@ traversals.
 ```jldoctest
 using ImplicitBVH
 using ImplicitBVH: BBox, BSphere
-using StaticArrays
 
 # Generate some simple bounding spheres
 bounding_spheres = [
-    BSphere{Float32}(SA[0., 0., 0.], 0.5),
-    BSphere{Float32}(SA[0., 0., 1.], 0.6),
-    BSphere{Float32}(SA[0., 0., 2.], 0.5),
-    BSphere{Float32}(SA[0., 0., 3.], 0.4),
-    BSphere{Float32}(SA[0., 0., 4.], 0.6),
+    BSphere{Float32}([0., 0., 0.], 0.5),
+    BSphere{Float32}([0., 0., 1.], 0.6),
+    BSphere{Float32}([0., 0., 2.], 0.5),
+    BSphere{Float32}([0., 0., 3.], 0.4),
+    BSphere{Float32}([0., 0., 4.], 0.6),
 ]
 
 # Build BVH
@@ -130,7 +129,7 @@ function traverse(
         # Check contacts in bvtt1 and add future checks in bvtt2; only sprout self-checks before
         # second-to-last level as leaf self-checks are pointless
         self_checks = level < bvh.tree.levels - 1
-        num_bvtt = traverse_nodes_atomic!(bvh, bvtt1, bvtt2, num_bvtt, self_checks)
+        num_bvtt = traverse_nodes!(bvh, bvtt1, bvtt2, num_bvtt, self_checks)
 
         num_checks += num_bvtt
 
@@ -141,7 +140,7 @@ function traverse(
 
     # Arrived at final leaf level, now populating contact list
     length(bvtt2) < num_bvtt && resize!(bvtt2, num_bvtt)
-    num_bvtt = traverse_leaves_atomic!(bvh, bvtt1, bvtt2, num_bvtt)
+    num_bvtt = traverse_leaves!(bvh, bvtt1, bvtt2, num_bvtt)
 
     # Return contact list and the other buffer as possible cache
     BVHTraversal(start_level, num_checks, num_bvtt, bvtt2, bvtt1)
@@ -190,7 +189,7 @@ function initial_bvtt(bvh, start_level, cache)
 end
 
 
-function traverse_nodes_atomic_range!(
+function traverse_nodes_range!(
     bvh, src, dst, num_written, self_checks, irange,
 )
     # Check src[irange[1]:irange[2]] and write to dst[1:num_dst]; dst should be given as a view
@@ -258,14 +257,14 @@ end
 
 
 
-function traverse_nodes_atomic!(bvh, src, dst, num_src, self_checks=true)
+function traverse_nodes!(bvh, src, dst, num_src, self_checks=true)
     # Traverse levels above leaves => no contacts, only further BVTT sprouting
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
     tp = TaskPartitioner(num_src, Threads.nthreads(), 100)
     if tp.num_tasks == 1
-        num_dst = traverse_nodes_atomic_range!(
+        num_dst = traverse_nodes_range!(
             bvh,
             src, dst, nothing,
             self_checks,
@@ -278,7 +277,7 @@ function traverse_nodes_atomic!(bvh, src, dst, num_src, self_checks=true)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
             istart, iend = tp[i]
-            tasks[i] = Threads.@spawn traverse_nodes_atomic_range!(
+            tasks[i] = Threads.@spawn traverse_nodes_range!(
                 bvh,
                 src, view(dst, 4istart - 3:4iend), view(num_written, i),
                 self_checks,
@@ -308,7 +307,7 @@ end
 
 
 
-function traverse_leaves_atomic_range!(
+function traverse_leaves_range!(
     bvh, src, contacts, num_written, irange
 )
     # Check src[irange[1]:irange[2]] and write to dst[1:num_dst]; dst should be given as a view
@@ -345,14 +344,14 @@ function traverse_leaves_atomic_range!(
 end
 
 
-function traverse_leaves_atomic!(bvh, src, contacts, num_src)
+function traverse_leaves!(bvh, src, contacts, num_src)
     # Traverse final level, only doing leaf-leaf checks
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
     tp = TaskPartitioner(num_src, Threads.nthreads(), 100)
     if tp.num_tasks == 1
-        num_contacts = traverse_leaves_atomic_range!(
+        num_contacts = traverse_leaves_range!(
             bvh,
             src, view(contacts, :), nothing,
             (1, num_src),
@@ -366,7 +365,7 @@ function traverse_leaves_atomic!(bvh, src, contacts, num_src)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
             istart, iend = tp[i]
-            tasks[i] = Threads.@spawn traverse_leaves_atomic_range!(
+            tasks[i] = Threads.@spawn traverse_leaves_range!(
                 bvh,
                 src, view(contacts, istart:iend), view(num_written, i),
                 (istart, iend),

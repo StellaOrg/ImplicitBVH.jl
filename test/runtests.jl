@@ -3,7 +3,32 @@ using ImplicitBVH: BBox, BSphere
 
 using Test
 using Random
-using StaticArrays
+using LinearAlgebra
+
+
+@testset "test_utilities" begin
+
+    using ImplicitBVH: minimum2, minimum3, maximum2, maximum3, dot3, dist23, dist3
+
+    Random.seed!(42)
+    for _ in 1:20
+        a, b, c = rand(), rand(), rand()
+        @test minimum2(a, b) == minimum([a, b])
+        @test maximum2(a, b) == maximum([a, b])
+
+        @test minimum3(a, b, c) == minimum([a, b, c])
+        @test maximum3(a, b, c) == maximum([a, b, c])
+    end
+
+    for _ in 1:20
+        x = (rand(), rand(), rand())
+        y = (rand(), rand(), rand())
+
+        @test dot3(x, y) ≈ dot(x, y)
+        @test dist23(x, y) ≈ dot(x .- y, x .- y)
+        @test dist3(x, y) ≈ sqrt(dot(x .- y, x .- y))
+    end
+end
 
 
 @testset "test_implicit_tree" begin
@@ -55,7 +80,6 @@ using StaticArrays
     # Trees with different integer types
     @test ImplicitTree{Int32}(11).real_nodes isa Int32
     @test ImplicitTree{UInt32}(11).real_nodes isa UInt32
-
 end
 
 
@@ -63,31 +87,33 @@ end
 
 @testset "test_bsphere" begin
 
+    Base.isapprox(a::NTuple{3, T}, b) where T = all(isapprox.(a, b))
+
     # Planar equilateral triangle
-    p1 = SVector{3}((0., 0., 0.))
-    p2 = SVector{3}((1., 0., 0.))
-    p3 = SVector{3}((cosd(60), sind(60), 0.))
+    p1 = (0., 0., 0.)
+    p2 = (1., 0., 0.)
+    p3 = (cosd(60), sind(60), 0.)
 
     bs = BSphere{Float64}(p1, p2, p3)
-    @test bs.x ≈ (p1 + p2 + p3) / 3.
+    @test bs.x ≈ (p1 .+ p2 .+ p3) ./ 3.
     @test bs.r ≈ 1. / sqrt(3.)
 
     # Planar right triangle
-    p1 = SVector{3}((0., 0., 0.))
-    p2 = SVector{3}((0., 1., 0.))
-    p3 = SVector{3}((0., 1., 1.))
+    p1 = [0., 0., 0.]
+    p2 = [0., 1., 0.]
+    p3 = [0., 1., 1.]
 
     bs = BSphere{Float64}(p1, p2, p3)
-    @test bs.x ≈ SVector{3}((0., 0.5, 0.5))
+    @test bs.x ≈ (0., 0.5, 0.5)
     @test bs.r ≈ 1. / sqrt(2.)
 
     # Points in straight line
-    p1 = SVector{3}((0., 0., 0.))
-    p2 = SVector{3}((1., 0., 0.))
-    p3 = SVector{3}((2., 0., 0.))
+    p1 = (0., 0., 0.)
+    p2 = (1., 0., 0.)
+    p3 = (2., 0., 0.)
 
     bs = BSphere{Float64}(p1, p2, p3)
-    @test bs.x ≈ SVector{3}((1., 0., 0.))
+    @test bs.x ≈ (1., 0., 0.)
     @test bs.r ≈ 1.
 
     # Other constructors
@@ -95,40 +121,39 @@ end
     BSphere(p1, p2, p3)
     BSphere{Float32}([p1, p2, p3])
     BSphere([p1, p2, p3])
-    BSphere(hcat(p1, p2, p3))
+    BSphere(reshape([p1..., p2..., p3...], 3, 3))
 
     # Merging two touching spheres
-    a = BSphere(SVector{3}((0., 0., 0.)), 0.5)
-    b = BSphere(SVector{3}((1., 0., 0.)), 0.5)
+    a = BSphere((0., 0., 0.), 0.5)
+    b = BSphere((1., 0., 0.), 0.5)
     c = a + b
-    @test c.x ≈ SVector{3}((0.5, 0., 0.))
+    @test c.x ≈ (0.5, 0., 0.)
     @test c.r ≈ 1.
 
     # Merging when a is inside b
-    a = BSphere(SVector{3}((0.1, 0., 0.)), 0.1)
-    b = BSphere(SVector{3}((0., 0., 0.)), 0.5)
+    a = BSphere((0.1, 0., 0.), 0.1)
+    b = BSphere((0., 0., 0.), 0.5)
     c = a + b
     @test c.x ≈ b.x
     @test c.r ≈ b.r
 
     # Merging when b is inside a
-    a = BSphere(SVector{3}((0., 0., 0.)), 0.5)
-    b = BSphere(SVector{3}((0.1, 0., 0.)), 0.1)
+    a = BSphere((0., 0., 0.), 0.5)
+    b = BSphere((0.1, 0., 0.), 0.1)
     c = a + b
     @test c.x ≈ a.x
     @test c.r ≈ a.r
 
     # Merging for completely overlapping spheres
-    a = BSphere(SVector{3}((0., 0., 0.)), 0.5)
+    a = BSphere((0., 0., 0.), 0.5)
     c = a + a
     @test c.x ≈ a.x
     @test c.r ≈ a.r
 
-    a = BSphere(SVector{3}((1e25, 1e25, 1e25)), 0.5)
+    a = BSphere((1e25, 1e25, 1e25), 0.5)
     c = a + a
     @test c.x ≈ a.x
     @test c.r ≈ a.r
-
 end
 
 
@@ -137,62 +162,61 @@ end
 @testset "test_bbox" begin
 
     # Cubically-placed points
-    p1 = SVector{3}((0., 0., 0.))
-    p2 = SVector{3}((1., 1., 0.))
-    p3 = SVector{3}((1., 1., 1.))
+    p1 = (0., 0., 0.)
+    p2 = (1., 1., 0.)
+    p3 = (1., 1., 1.)
 
     bb = BBox{Float64}(p1, p2, p3)
-    @test bb.lo ≈ SVector{3}((0., 0., 0.))
-    @test bb.up ≈ SVector{3}((1., 1., 1.))
+    @test bb.lo ≈ (0., 0., 0.)
+    @test bb.up ≈ (1., 1., 1.)
 
     # Points in straight line
-    p1 = SVector{3}((0., 0., 0.))
-    p2 = SVector{3}((1., 0., 0.))
-    p3 = SVector{3}((2., 0., 0.))
+    p1 = [0., 0., 0.]
+    p2 = [1., 0., 0.]
+    p3 = [2., 0., 0.]
 
     bb = BBox{Float64}(p1, p2, p3)
-    @test bb.lo ≈ SVector{3}((0., 0., 0.))
-    @test bb.up ≈ SVector{3}((2., 0., 0.))
+    @test bb.lo ≈ (0., 0., 0.)
+    @test bb.up ≈ (2., 0., 0.)
 
     # Other constructors
     BBox{Float32}(p1, p2, p3)
     BBox(p1, p2, p3)
     BBox{Float32}([p1, p2, p3])
     BBox([p1, p2, p3])
-    BBox(hcat(p1, p2, p3))
+    BBox(reshape([p1..., p2..., p3...], 3, 3))
 
     # Merging two touching boxes
-    a = BBox(SVector{3}((0., 0., 0.)), SVector{3}((1., 1., 1.)))
-    b = BBox(SVector{3}((1., 0., 0.)), SVector{3}((2., 1., 1.)))
+    a = BBox((0., 0., 0.), (1., 1., 1.))
+    b = BBox((1., 0., 0.), (2., 1., 1.))
     c = a + b
-    @test c.lo ≈ SVector{3}((0., 0., 0.))
-    @test c.up ≈ SVector{3}((2., 1., 1.))
+    @test c.lo ≈ (0., 0., 0.)
+    @test c.up ≈ (2., 1., 1.)
 
     # Merging when a is inside b
-    a = BBox(SVector{3}((0.1, 0.1, 0.1)), SVector{3}((0.2, 0.2, 0.2)))
-    b = BBox(SVector{3}((0., 0., 0.)), SVector{3}((1., 1., 1.)))
+    a = BBox((0.1, 0.1, 0.1), (0.2, 0.2, 0.2))
+    b = BBox((0., 0., 0.), (1., 1., 1.))
     c = a + b
     @test c.lo ≈ b.lo
     @test c.up ≈ b.up
 
     # Merging when b is inside a
-    a = BBox(SVector{3}((0., 0., 0.)), SVector{3}((1., 1., 1.)))
-    b = BBox(SVector{3}((0.1, 0.1, 0.1)), SVector{3}((0.2, 0.2, 0.2)))
+    a = BBox((0., 0., 0.), (1., 1., 1.))
+    b = BBox((0.1, 0.1, 0.1), (0.2, 0.2, 0.2))
     c = a + b
     @test c.lo ≈ a.lo
     @test c.up ≈ a.up
 
     # Merging for completely overlapping boxes
-    a = BBox(SVector{3}((0., 0., 0.)), SVector{3}((1., 1., 1.)))
+    a = BBox((0., 0., 0.), (1., 1., 1.))
     c = a + a
     @test c.lo ≈ a.lo
     @test c.up ≈ a.up
 
-    a = BBox(SVector{3}((1e-25, 1e-25, 1e-25)), SVector{3}((1e25, 1e25, 1e25)))
+    a = BBox((1e-25, 1e-25, 1e-25), (1e25, 1e25, 1e25))
     c = a + a
     @test c.lo ≈ a.lo
     @test c.up ≈ a.up
-
 end
 
 
@@ -217,17 +241,14 @@ end
     Random.seed!(42)
 
     # Extrema computed at different precisions
-    #
-    # TODO: BSphere{Float16} returns NaNs
-    # bv = map(BSphere{Float16}, [100 .* rand(3, 3) for _ in 1:100])
-    # display(bv)
-    # mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
-    # @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
-    # @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
-    # @test all([ImplicitBVH.center(b)[3] > mins[3] for b in bv])
-    # @test all([ImplicitBVH.center(b)[1] < maxs[1] for b in bv])
-    # @test all([ImplicitBVH.center(b)[2] < maxs[2] for b in bv])
-    # @test all([ImplicitBVH.center(b)[3] < maxs[3] for b in bv])
+    bv = map(BSphere{Float16}, [10 .* rand(3, 3) for _ in 1:100])
+    mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
+    @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
+    @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
+    @test all([ImplicitBVH.center(b)[3] > mins[3] for b in bv])
+    @test all([ImplicitBVH.center(b)[1] < maxs[1] for b in bv])
+    @test all([ImplicitBVH.center(b)[2] < maxs[2] for b in bv])
+    @test all([ImplicitBVH.center(b)[3] < maxs[3] for b in bv])
 
     bv = map(BSphere{Float32}, [1000 .* rand(3, 3) for _ in 1:100])
     mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
@@ -248,7 +269,7 @@ end
     @test all([ImplicitBVH.center(b)[3] < maxs[3] for b in bv])
 
     # Extrema computed for degenerate inputs
-    bv = [BSphere(SA[0., 0, 0], 1.)]
+    bv = [BSphere((0., 0., 0.), 1.)]
     mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
     @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
     @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
@@ -257,7 +278,7 @@ end
     @test all([ImplicitBVH.center(b)[2] < maxs[2] for b in bv])
     @test all([ImplicitBVH.center(b)[3] < maxs[3] for b in bv])
 
-    bv = [BSphere(SA[1000., 0, 0], 1.), BSphere(SA[1000., 0, 0], 1.)]
+    bv = [BSphere((1000., 0., 0.), 1.), BSphere((1000., 0., 0.), 1.)]
     mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
     @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
     @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
@@ -304,8 +325,8 @@ end
     ImplicitBVH.morton_encode(bv)
 
     # Degenerate inputs
-    a = BSphere(SVector{3}((0., 0., 0.)), 0.5)
-    b = BSphere(SVector{3}((1., 0., 0.)), 0.1)
+    a = BSphere((0., 0., 0.), 0.5)
+    b = BSphere((1., 0., 0.), 0.1)
     ImplicitBVH.morton_encode([a, b], UInt32)
     ImplicitBVH.morton_encode([a, a], UInt32)
     ImplicitBVH.morton_encode([a], UInt32)
@@ -318,11 +339,11 @@ end
 
     # Simple, ordered bounding spheres traversal test
     bvs = [
-        BSphere(SA[0., 0, 0], 0.5),
-        BSphere(SA[0., 0, 1], 0.6),
-        BSphere(SA[0., 0, 2], 0.5),
-        BSphere(SA[0., 0, 3], 0.4),
-        BSphere(SA[0., 0, 4], 0.6),
+        BSphere([0., 0, 0], 0.5),
+        BSphere([0., 0, 1], 0.6),
+        BSphere([0., 0, 2], 0.5),
+        BSphere([0., 0, 3], 0.4),
+        BSphere([0., 0, 4], 0.6),
     ]
 
     # Build the following ImplicitBVH from 5 bounding volumes:
@@ -357,11 +378,11 @@ end
 
     # Bounding spheres traversal test with unordered spheres
     bvs = [
-        BSphere(SA[0., 0, 1], 0.6),
-        BSphere(SA[0., 0, 2], 0.5),
-        BSphere(SA[0., 0, 0], 0.5),
-        BSphere(SA[0., 0, 4], 0.6),
-        BSphere(SA[0., 0, 3], 0.4),
+        BSphere([0., 0, 1], 0.6),
+        BSphere([0., 0, 2], 0.5),
+        BSphere([0., 0, 0], 0.5),
+        BSphere([0., 0, 4], 0.6),
+        BSphere([0., 0, 3], 0.4),
     ]
 
     # Build the following ImplicitBVH from 5 bounding volumes:

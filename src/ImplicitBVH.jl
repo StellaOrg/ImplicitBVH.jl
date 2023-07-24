@@ -13,7 +13,6 @@ export ImplicitTree, memory_index, level_indices, isvirtual
 
 # Internal dependencies
 using LinearAlgebra
-using StaticArrays
 using DocStringExtensions
 
 

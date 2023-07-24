@@ -2,7 +2,7 @@
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/dev)
 
 # ImplicitBVH.jl
-*Fast, Robust Parallel Bounding Volume Hierarchy for Collision Detection in Dynamic Scenes*
+*High-Performance Parallel Bounding Volume Hierarchy for Collision Detection*
 
 It uses an implicit bounding volume hierarchy constructed from an iterable of some geometric
 primitives' (e.g. triangles in a mesh) bounding volumes forming the `ImplicitTree` leaves. The leaves
@@ -23,15 +23,14 @@ Simple usage with bounding spheres and default 64-bit types:
 ```julia
 using ImplicitBVH
 using ImplicitBVH: BBox, BSphere
-using StaticArrays
 
 # Generate some simple bounding spheres
 bounding_spheres = [
-    BSphere(SA[0., 0., 0.], 0.5),
-    BSphere(SA[0., 0., 1.], 0.6),
-    BSphere(SA[0., 0., 2.], 0.5),
-    BSphere(SA[0., 0., 3.], 0.4),
-    BSphere(SA[0., 0., 4.], 0.6),
+    BSphere([0., 0., 0.], 0.5),
+    BSphere([0., 0., 1.], 0.6),
+    BSphere([0., 0., 2.], 0.5),
+    BSphere([0., 0., 3.], 0.4),
+    BSphere([0., 0., 4.], 0.6),
 ]
 
 # Build BVH
@@ -51,15 +50,14 @@ Morton codes:
 ```julia
 using ImplicitBVH
 using ImplicitBVH: BBox, BSphere
-using StaticArrays
 
 # Generate some simple bounding spheres
 bounding_spheres = [
-    BSphere{Float32}(SA[0., 0., 0.], 0.5),
-    BSphere{Float32}(SA[0., 0., 1.], 0.6),
-    BSphere{Float32}(SA[0., 0., 2.], 0.5),
-    BSphere{Float32}(SA[0., 0., 3.], 0.4),
-    BSphere{Float32}(SA[0., 0., 4.], 0.6),
+    BSphere{Float32}([0., 0., 0.], 0.5),
+    BSphere{Float32}([0., 0., 1.], 0.6),
+    BSphere{Float32}([0., 0., 2.], 0.5),
+    BSphere{Float32}([0., 0., 3.], 0.4),
+    BSphere{Float32}([0., 0., 4.], 0.6),
 ]
 
 # Build BVH
@@ -103,6 +101,18 @@ Tree Level          Nodes & Leaves               Build Up    Traverse Down
 
 We do not need to store the "virtual" nodes in memory; rather, we can compute the number of virtual
 nodes we need to skip to get to a given node index, following the fantastic ideas from [1].
+
+
+# Performance
+
+As contact detection is one of the most computationally-intensive parts of physical simulation and computer
+vision applications, this implementation has been optimised for maximum performance and scalability:
+
+- Computing bounding volumes is optimised for triangles, e.g. constructing 249,882 `BSphere{Float64}` on a single thread takes 4.47 ms on my Mac M1. The construction itself has zero allocations; all computation can be done in parallel.
+- Building a complete bounding volume hierarchy from the 249,882 triangles of [`xyzrgb_dragon.obj`](https://github.com/alecjacobson/common-3d-test-models/blob/master/data/xyzrgb_dragon.obj) takes 11.83 ms single-threaded. The sorting step is the bottleneck, so multi-threading the Morton encoding and BVH up-building does not significantly improve the runtime; waiting on a multi-threaded sorter.
+- Traversing the same 249,882 `BSphere{Float64}` for the triangles (aggregated into `BBox{Float64}` parents) takes 136.38 ms single-threaded and 43.16 ms with 4 threads, at 79% strong scaling.
+
+Only fundamental Julia types are used - e.g. `struct`, `Tuple`, `UInt`, `Float64` - which can be straightforwardly inlined, unrolled and fused by the compiler. These types are also straightforward to transpile to accelerators via `KernelAbstractions.jl`(https://github.com/JuliaGPU/KernelAbstractions.jl) such as `CUDA`, `AMDGPU`, `oneAPI`, `Apple Metal`.
 
 
 # Roadmap

@@ -1,2 +1,2 @@
 using PProf
-PProf.refresh(; file="bvh_contact.pb.gz")
+PProf.refresh(; file="bvh_volumes.pb.gz")
