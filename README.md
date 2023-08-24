@@ -1,4 +1,4 @@
-[![ImplicitBVH](https://github.com/StellaOrg/ImplicitBVH/blob/main/docs/src/static/bunny.png?raw=true)](https://stellaorg.github.io/ImplicitBVH.jl/)
+[![ImplicitBVH](https://github.com/StellaOrg/ImplicitBVH.jl/blob/main/docs/src/static/bunny.png?raw=true)](https://stellaorg.github.io/ImplicitBVH.jl/)
 
 
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/stable)
