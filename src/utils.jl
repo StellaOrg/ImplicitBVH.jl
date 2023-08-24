@@ -107,19 +107,22 @@ end
 
 
 # Specialised maths functions
+pow2(n::Integer) = 1 << n
+
+
 function dot3(x, y)
     x[1] * y[1] + x[2] * y[2] + x[3] * y[3]
 end
 
 
-function dist23(x, y)
+function dist3sq(x, y)
     (x[1] - y[1]) * (x[1] - y[1]) +
     (x[2] - y[2]) * (x[2] - y[2]) +
     (x[3] - y[3]) * (x[3] - y[3])
 end
 
 
-dist3(x, y) = sqrt(dist23(x, y))
+dist3(x, y) = sqrt(dist3sq(x, y))
 
 minimum2(a, b) = a < b ? a : b
 minimum3(a, b, c) = a < b ? minimum2(a, c) : minimum2(b, c)

@@ -77,7 +77,6 @@ function BSphere{T}(p1, p2, p3) where T
 
     d = T(2.) * (abab * acac - abac * abac)
 
-    # Declaring bounding sphere centre and radius
     if abs(d) <= eps(T)
         # a, b, c lie on a line. Find line centre and radius
         lower = (minimum3(a[1], b[1], c[1]),
@@ -182,7 +181,7 @@ Base.:+(a::BSphere, b::BSphere) = BSphere(a, b)
 
 # Contact detection
 function iscontact(a::BSphere, b::BSphere)
-    dist23(a.x, b.x) <= (a.r + b.r) * (a.r + b.r)
+    dist3sq(a.x, b.x) <= (a.r + b.r) * (a.r + b.r)
 end
 
 

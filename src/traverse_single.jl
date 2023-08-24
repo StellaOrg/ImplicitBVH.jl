@@ -1,70 +1,17 @@
 """
-    $(TYPEDEF)
+    default_start_level(bvh::BVH)::Int
 
-Alias for a tuple of two indices representing e.g. a contacting pair.
+Compute the default start level when traversing a single BVH tree.
 """
-const IndexPair = Tuple{Int, Int}
-
-
-"""
-    $(TYPEDEF)
-
-Collected BVH traversal `contacts` vector, some stats, plus the two buffers `cache1` and `cache2`
-which can be reused for future traversals to minimise memory allocations.
-
-# Fields
-- `start_level::Int`: the level at which the traversal started.
-- `num_checks::Int`: the total number of contact checks done.
-- `num_contacts::Int`: the number of contacts found.
-- `contacts::view(cache1, 1:num_contacts)`: the contacting pairs found, as a view into `cache1`.
-- `cache1::C1{IndexPair} <: AbstractVector`: first BVH traversal buffer.
-- `cache2::C2{IndexPair} <: AbstractVector`: second BVH traversal buffer.
-"""
-struct BVHTraversal{C1 <: AbstractVector, C2 <: AbstractVector}
-    # Stats
-    start_level::Int
-    num_checks::Int
-
-    # Data
-    num_contacts::Int
-    cache1::C1
-    cache2::C2
+function default_start_level(bvh::BVH)
+    maximum2(bvh.tree.levels ÷ 2, bvh.built_level)
 end
-
-
-# Custom pretty-printing
-function Base.show(io::IO, t::BVHTraversal{C1, C2}) where {C1, C2}
-    print(
-        io,
-        """
-        BVHTraversal
-          start_level:  $(typeof(t.start_level)) $(t.start_level)
-          num_checks:   $(typeof(t.num_checks)) $(t.num_checks)
-          num_contacts: $(typeof(t.num_contacts)) $(t.num_contacts)
-          contacts:     $(Base.typename(typeof(t.contacts)).wrapper){IndexPair}($(size(t.contacts)))
-          cache1:       $C1($(size(t.cache1)))
-          cache2:       $C2($(size(t.cache2)))
-        """
-    )
-end
-
-
-function Base.getproperty(bt::BVHTraversal, sym::Symbol)
-   if sym === :contacts
-       return @view bt.cache1[1:bt.num_contacts]
-   else
-       return getfield(bt, sym)
-   end
-end
-
-Base.propertynames(::BVHTraversal) = (:start_level, :num_checks, :contacts,
-                                      :num_contacts, :cache1, :cache2)
 
 
 """
     traverse(
         bvh::BVH,
-        start_level=max(bvh.tree.levels ÷ 2, bvh.built_level),
+        start_level::Int=default_start_level(bvh),
         cache::Union{Nothing, BVHTraversal}=nothing,
     )::BVHTraversal
 
@@ -99,12 +46,12 @@ traversal = traverse(bvh, 2, traversal)
 ;
 
 # output
-traversal.contacts = [(4, 5), (1, 2), (2, 3)]
+traversal.contacts = [(1, 2), (2, 3), (4, 5)]
 ```
 """
 function traverse(
-    bvh,
-    start_level=max(bvh.tree.levels ÷ 2, bvh.built_level),
+    bvh::BVH,
+    start_level::Int,
     cache::Union{Nothing, BVHTraversal}=nothing,
 )
 
@@ -147,15 +94,21 @@ function traverse(
 end
 
 
+# Needed for compiler disambiguation; user interface is the same as for a default argument
+function traverse(bvh::BVH)
+    traverse(bvh, default_start_level(bvh), nothing)
+end
+
+
 function initial_bvtt(bvh, start_level, cache)
-    # Generate all possible contact checks for the given start_level to avoid the very little
-    # work to do at the top
-    level_nodes = 2^(start_level - 1)
-    level_checks = level_nodes * (level_nodes + 1) ÷ 2
+    # Generate all possible contact checks at the given start_level
+    level_nodes = pow2(start_level - 1)
+    level_checks = (level_nodes - 1) * level_nodes ÷ 2 + level_nodes
 
     # If we're not at leaf-level, allocate enough memory for next BVTT expansion
     initial_number = start_level == bvh.tree.levels ? level_checks : 4 * level_checks
 
+    # Reuse cache if given
     if isnothing(cache)
         bvtt1 = similar(bvh.nodes, IndexPair, initial_number)
         bvtt2 = similar(bvh.nodes, IndexPair, initial_number)
@@ -167,21 +120,21 @@ function initial_bvtt(bvh, start_level, cache)
         length(bvtt2) < initial_number && resize!(bvtt2, initial_number)
     end
 
-    # Insert all node-node checks - i.e. no self-checks
+    # Insert all checks at this level
     num_bvtt = 0
     num_real = level_nodes - bvh.tree.virtual_leaves >> (bvh.tree.levels - start_level)
-    @inbounds for i in level_nodes:level_nodes + num_real - 2
+    @inbounds for i in level_nodes:level_nodes + num_real - 1
+
+        # Only insert self-checks if we still have nodes below us; leaf self-checks are not needed
+        if start_level != bvh.tree.levels
+            num_bvtt += 1
+            bvtt1[num_bvtt] = (i, i)
+        end
+
+        # Node-node pair checks
         for j in i + 1:level_nodes + num_real - 1
             num_bvtt += 1
             bvtt1[num_bvtt] = (i, j)
-        end
-    end
-
-    # Only insert self-checks if we still have nodes below us; leaf-level self-checks aren't needed
-    if start_level != bvh.tree.levels
-        @inbounds for i in level_nodes:level_nodes + num_real - 1
-            num_bvtt += 1
-            bvtt1[num_bvtt] = (i, i)
         end
     end
 
@@ -212,8 +165,8 @@ function traverse_nodes_range!(
             else
                 if self_checks
                     dst[num_dst + 1] = (implicit1 * 2, implicit1 * 2)
-                    dst[num_dst + 2] = (implicit1 * 2 + 1, implicit1 * 2 + 1)
-                    dst[num_dst + 3] = (implicit1 * 2, implicit1 * 2 + 1)
+                    dst[num_dst + 2] = (implicit1 * 2, implicit1 * 2 + 1)
+                    dst[num_dst + 3] = (implicit1 * 2 + 1, implicit1 * 2 + 1)
                     num_dst += 3
                 else
                     dst[num_dst + 1] = (implicit1 * 2, implicit1 * 2 + 1)
@@ -223,6 +176,8 @@ function traverse_nodes_range!(
 
         # Otherwise pair children of the two nodes
         else
+            # TODO: can we avoid calling memory_index every time? the number of virtual nodes we
+            # need to skip is constant for each level
             node1 = bvh.nodes[memory_index(bvh.tree, implicit1)]
             node2 = bvh.nodes[memory_index(bvh.tree, implicit2)]
 
@@ -313,23 +268,26 @@ function traverse_leaves_range!(
     # Check src[irange[1]:irange[2]] and write to dst[1:num_dst]; dst should be given as a view
     num_dst = 0
 
-    # Number of indices above leaf-level to subtract from real index
-    num_above = bvh.tree.real_nodes - bvh.tree.real_leaves
+    # Number of implicit indices above leaf-level
+    num_above = pow2(bvh.tree.levels - 1) - 1
 
     # For each BVTT pair of nodes, check for contact
     @inbounds for i in irange[1]:irange[2]
         # Extract implicit indices of BVH leaves to test
         implicit1, implicit2 = src[i]
 
-        real1 = bvh.order[memory_index(bvh.tree, implicit1) - num_above]
-        real2 = bvh.order[memory_index(bvh.tree, implicit2) - num_above]
+        iorder1 = bvh.order[implicit1 - num_above]
+        iorder2 = bvh.order[implicit2 - num_above]
 
-        leaf1 = bvh.leaves[real1]
-        leaf2 = bvh.leaves[real2]
+        leaf1 = bvh.leaves[iorder1]
+        leaf2 = bvh.leaves[iorder2]
 
         # If two leaves are touching, save in contacts
         if iscontact(leaf1, leaf2)
-            contacts[num_dst + 1] = real1 < real2 ? (real1, real2) : (real2, real1)
+
+            # While it's guaranteed that implicit1 < implicit2, the bvh.order may not be
+            # ascending, so we add this comparison to output ordered contact indices
+            contacts[num_dst + 1] = iorder1 < iorder2 ? (iorder1, iorder2) : (iorder2, iorder1)
             num_dst += 1
         end
     end

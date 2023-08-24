@@ -65,7 +65,7 @@ traversal = traverse(bvh)
 ;
 
 # output
-traversal.contacts = [(4, 5), (1, 2), (2, 3)]
+traversal.contacts = [(1, 2), (2, 3), (4, 5)]
 ```
 
 Using `Float32` bounding spheres for leaves, `Float32` bounding boxes for nodes above, and `UInt32`
@@ -93,7 +93,7 @@ traversal = traverse(bvh)
 ;
 
 # output
-traversal.contacts = [(4, 5), (1, 2), (2, 3)]
+traversal.contacts = [(1, 2), (2, 3), (4, 5)]
 ```
 
 Build BVH up to level 2 and start traversing down from level 3, reusing the previous traversal
@@ -122,8 +122,8 @@ function Base.show(io::IO, b::BVH{VN, VL, VO}) where {VN, VL, VO}
           built_level: $(typeof(b.built_level)) $(b.built_level)
           tree:        $(b.tree)
           nodes:       $(VN)($(size(b.nodes)))
-          leaves:      $(VL)($(size(b.nodes)))
-          order:       $(VO)($(size(b.nodes)))
+          leaves:      $(VL)($(size(b.leaves)))
+          order:       $(VO)($(size(b.order)))
         """
     )
 end
@@ -246,13 +246,13 @@ end
 @inline function aggregate_last_level!(bvh_nodes, bvh_leaves, tree, order)
     # Memory index of first node on this level (i.e. first above leaf-level)
     level = tree.levels - 1
-    start_pos = memory_index(tree, 1 << (level - 1))
+    start_pos = memory_index(tree, pow2(level - 1))
 
     # Number of real nodes on this level
-    num_nodes = 1 << (level - 1) - tree.virtual_leaves >> (tree.levels - level)
+    num_nodes = pow2(level - 1) - tree.virtual_leaves >> (tree.levels - level)
 
     # Merge all pairs of children below this level
-    num_nodes_next = 1 << level - tree.virtual_leaves >> (tree.levels - (level + 1))
+    num_nodes_next = pow2(level) - tree.virtual_leaves >> (tree.levels - (level + 1))
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call

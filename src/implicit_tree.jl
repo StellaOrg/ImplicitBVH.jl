@@ -137,8 +137,8 @@ Return range Tuple{Int64, Int64} of memory indices of elements at `level`.
     end
 
     # Index of first element at this level
-    start = @inbounds memory_index(tree, 2^(level - 1))
-    nreal = 1 << (level - 1) - tree.virtual_leaves >> (tree.levels - level)
+    start = @inbounds memory_index(tree, pow2(level - 1))
+    nreal = pow2(level - 1) - tree.virtual_leaves >> (tree.levels - level)
     stop = start + nreal - 1
 
     start, stop
@@ -160,7 +160,7 @@ Check if given `implicit_index` corresponds to a virtual node.
 
     # Level at which the implicit index is
     level = @inbounds ilog2(implicit_index, RoundDown) + 1
-    level_first = 1 << (level - 1)
+    level_first = pow2(level - 1)
     nreal = level_first - tree.virtual_leaves >> (tree.levels - level)
 
     # If index is beyond last real node, it's virtual

@@ -7,7 +7,7 @@
 module ImplicitBVH
 
 # Functionality exported by this package by default
-export BVH, BVHTraversal, traverse
+export BVH, BVHTraversal, traverse, default_start_level
 export ImplicitTree, memory_index, level_indices, isvirtual
 
 
@@ -21,7 +21,7 @@ include("utils.jl")
 include("morton.jl")
 include("implicit_tree.jl")
 include("bounding_volumes.jl")
-include("ibvh_build.jl")
-include("ibvh_traverse.jl")
+include("build.jl")
+include("traverse.jl")
 
 end     # module ImplicitBVH
