@@ -41,7 +41,7 @@ traversal = traverse(bvh)
 @show traversal.contacts
 
 # output
-traversal.contacts = [(4, 5), (1, 2), (2, 3)]
+traversal.contacts = [(1, 2), (2, 3), (4, 5)]
 ```
 
 Using `Float32` bounding spheres for leaves, `Float32` bounding boxes for nodes above, and `UInt32`
@@ -68,7 +68,7 @@ traversal = traverse(bvh)
 @show traversal.contacts
 
 # output
-traversal.contacts = [(4, 5), (1, 2), (2, 3)]
+traversal.contacts = [(1, 2), (2, 3), (4, 5)]
 ```
 
 Build BVH up to level 2 and start traversing down from level 3, reusing the previous traversal

@@ -23,7 +23,37 @@ Return all the `bvh1` bounding volume leaves that are in contact with any in `bv
 
 # Examples
 
-TODO
+```jldoctest
+using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
+
+# Generate some simple bounding spheres
+bounding_spheres1 = [
+    BSphere{Float32}([0., 0., 0.], 0.5),
+    BSphere{Float32}([0., 0., 3.], 0.4),
+]
+
+bounding_spheres2 = [
+    BSphere{Float32}([0., 0., 1.], 0.6),
+    BSphere{Float32}([0., 0., 2.], 0.5),
+    BSphere{Float32}([0., 0., 4.], 0.6),
+]
+
+# Build BVHs
+bvh1 = BVH(bounding_spheres1, BBox{Float32}, UInt32)
+bvh2 = BVH(bounding_spheres2, BBox{Float32}, UInt32)
+
+# Traverse BVH for contact detection
+traversal = traverse(bvh1, bvh2, default_start_level(bvh1, bvh2))
+
+# Reuse traversal buffers for future contact detection - possibly with different BVHs
+traversal = traverse(bvh1, bvh2, default_start_level(bvh1, bvh2), traversal)
+@show traversal.contacts;
+;
+
+# output
+traversal.contacts = [(1, 1), (2, 3)]
+```
 """
 function traverse(
     bvh1::BVH{V1, V2, V3},
@@ -32,12 +62,22 @@ function traverse(
     cache::Union{Nothing, BVHTraversal}=nothing,
 ) where {V1, V2, V3}
 
-    @assert bvh1.tree.levels >= start_level >= bvh1.built_level
-    @assert bvh2.tree.levels >= start_level >= bvh2.built_level
+    @boundscheck begin
+        if bvh1.tree.levels == bvh2.tree.levels
+            @assert bvh1.tree.levels >= start_level >= bvh1.built_level
+            @assert bvh2.tree.levels >= start_level >= bvh2.built_level
+        else
+            @assert bvh1.tree.levels > start_level >= bvh1.built_level
+            @assert bvh2.tree.levels > start_level >= bvh2.built_level
+        end
+    end
 
     # Always have bigger bvh1.tree.levels > bvh2.tree.levels on the left
     if bvh1.tree.levels < bvh2.tree.levels
         bvh1, bvh2 = bvh2, bvh1
+        swapped = true
+    else
+        swapped = false
     end
 
     # Explanation: say BVH1 has 10 levels, BVH2 has 8 levels; the last level has "leaves" (the
@@ -107,7 +147,7 @@ function traverse(
 
     # Arrived at final leaf level with both BVHs, now populating contact list
     length(bvtt2) < num_bvtt && resize!(bvtt2, num_bvtt)
-    num_bvtt = traverse_leaves_pair!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt)
+    num_bvtt = traverse_leaves_pair!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, swapped)
 
     # Return contact list and the other buffer as possible cache
     BVHTraversal(start_level, num_checks, num_bvtt, bvtt2, bvtt1)
@@ -370,7 +410,7 @@ function traverse_nodes_left_range!(
 end
 
 
-function traverse_leaves_pair!(bvh1, bvh2, src, contacts, num_src)
+function traverse_leaves_pair!(bvh1, bvh2, src, contacts, num_src, swapped)
     # Traverse final level, only doing leaf-leaf checks
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
@@ -380,6 +420,7 @@ function traverse_leaves_pair!(bvh1, bvh2, src, contacts, num_src)
         num_contacts = traverse_leaves_pair_range!(
             bvh1, bvh2,
             src, view(contacts, :), nothing,
+            swapped,
             (1, num_src),
         )
     else
@@ -394,6 +435,7 @@ function traverse_leaves_pair!(bvh1, bvh2, src, contacts, num_src)
             tasks[i] = Threads.@spawn traverse_leaves_pair_range!(
                 bvh1, bvh2,
                 src, view(contacts, istart:iend), view(num_written, i),
+                swapped,
                 (istart, iend),
             )
         end
@@ -417,7 +459,7 @@ end
 
 
 function traverse_leaves_pair_range!(
-    bvh1, bvh2, src, contacts, num_written, irange
+    bvh1, bvh2, src, contacts, num_written, swapped, irange
 )
     # Check src[irange[1]:irange[2]] and write to dst[1:num_dst]; dst should be given as a view
     num_dst = 0
@@ -439,7 +481,7 @@ function traverse_leaves_pair_range!(
 
         # If two leaves are touching, save in contacts
         if iscontact(leaf1, leaf2)
-            contacts[num_dst + 1] = (iorder1, iorder2)
+            contacts[num_dst + 1] = swapped ? (iorder2, iorder1) : (iorder1, iorder2)
             num_dst += 1
         end
     end

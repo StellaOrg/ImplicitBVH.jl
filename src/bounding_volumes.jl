@@ -166,9 +166,10 @@ function BSphere{T}(a::BSphere, b::BSphere) where T
 
     # Bounding spheres are not enclosed
     else
-        centre = (T(0.5) * (a.x[1] + b.x[1]),
-                  T(0.5) * (a.x[2] + b.x[2]),
-                  T(0.5) * (a.x[3] + b.x[3]))
+        frac = T(0.5) * ((b.r - a.r) / length + T(1))
+        centre = (a.x[1] + frac * (b.x[1] - a.x[1]),
+                  a.x[2] + frac * (b.x[2] - a.x[2]),
+                  a.x[3] + frac * (b.x[3] - a.x[3]))
         radius = T(0.5) * (length + a.r + b.r)
         return BSphere{T}(centre, radius)
     end

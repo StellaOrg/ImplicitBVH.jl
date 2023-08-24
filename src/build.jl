@@ -213,7 +213,7 @@ end
         lchild_implicit = 2i - 1
         rchild_implicit = 2i
 
-        rchild_virtual = rchild_implicit >= num_nodes_next
+        rchild_virtual = rchild_implicit > num_nodes_next
 
         lchild_index = order[lchild_implicit]
         if !rchild_virtual
@@ -290,7 +290,7 @@ end
         lchild_index = start_pos_next + 2i - 2
         rchild_index = start_pos_next + 2i - 1
 
-        if rchild_index >= start_pos_next + num_nodes_next
+        if rchild_index > start_pos_next + num_nodes_next - 1
             # If right child is virtual, set the parent BV to the child one
             bvh_nodes[start_pos - 1 + i] = bvh_nodes[lchild_index]
         else
@@ -305,14 +305,14 @@ end
 
 @inline function aggregate_level!(bvh_nodes, level, tree)
     # Memory index of first node on this level
-    start_pos = memory_index(tree, 1 << (level - 1))
+    start_pos = memory_index(tree, pow2(level - 1))
 
     # Number of real nodes on this level
-    num_nodes = 1 << (level - 1) - tree.virtual_leaves >> (tree.levels - level)
+    num_nodes = pow2(level - 1) - tree.virtual_leaves >> (tree.levels - level)
 
     # Merge all pairs of children below this level
-    start_pos_next = memory_index(tree, 1 << level)
-    num_nodes_next = 1 << level - tree.virtual_leaves >> (tree.levels - (level + 1))
+    start_pos_next = memory_index(tree, pow2(level))
+    num_nodes_next = pow2(level) - tree.virtual_leaves >> (tree.levels - (level + 1))
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
