@@ -1,3 +1,6 @@
+[![ImplicitBVH](https://github.com/StellaOrg/ImplicitBVH/blob/main/docs/src/static/bunny.png?raw=true)](https://stellaorg.github.io/ImplicitBVH.jl/)
+
+
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/stable)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/dev)
 
