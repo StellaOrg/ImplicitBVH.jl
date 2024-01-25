@@ -82,6 +82,39 @@ bvh = BVH(bounding_spheres, BBox{Float32}, UInt32, 2)
 traversal = traverse(bvh, 3, traversal)
 ```
 
+Compute contacts between two different BVH trees (e.g. two different robotic parts):
+
+```julia
+using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
+
+# Generate some simple bounding spheres (will be BVH leaves)
+bounding_spheres1 = [
+    BSphere{Float32}([0., 0., 0.], 0.5),
+    BSphere{Float32}([0., 0., 3.], 0.4),
+]
+
+bounding_spheres2 = [
+    BSphere{Float32}([0., 0., 1.], 0.6),
+    BSphere{Float32}([0., 0., 2.], 0.5),
+    BSphere{Float32}([0., 0., 4.], 0.6),
+]
+
+# Build BVHs using bounding boxes for nodes
+bvh1 = BVH(bounding_spheres1, BBox{Float32}, UInt32)
+bvh2 = BVH(bounding_spheres2, BBox{Float32}, UInt32)
+
+# Traverse BVH for contact detection
+traversal = traverse(
+    bvh1,
+    bvh2,
+    default_start_level(bvh1),
+    default_start_level(bvh2),
+    # previous_traversal_cache,
+    # num_threads=4,
+)
+```
+
 Check out the `benchmark` folder for an example traversing an STL model.
 
 

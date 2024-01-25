@@ -168,7 +168,8 @@ function morton_encode!(
     mortons::AbstractVector{U},
     bounding_volumes::AbstractVector,
     mins,
-    maxs,
+    maxs;
+    num_threads=Threads.nthreads(),
 ) where {U <: MortonUnsigned}
 
     # Bounds checking
@@ -180,7 +181,7 @@ function morton_encode!(
     length(bounding_volumes) == 0 && return nothing
 
     # Encode bounding volumes' centres across multiple threads using contiguous ranges
-    tp = TaskPartitioner(length(bounding_volumes), Threads.nthreads(), 1000)
+    tp = TaskPartitioner(length(bounding_volumes), num_threads, 1000)
     if tp.num_tasks == 1
         morton_encode_range!(
             mortons, bounding_volumes,
@@ -205,11 +206,15 @@ function morton_encode!(
 end
 
 
-function morton_encode!(mortons::AbstractVector{U}, bounding_volumes) where {U <: MortonUnsigned}
+function morton_encode!(
+    mortons::AbstractVector{U},
+    bounding_volumes;
+    num_threads=Threads.nthreads(),
+) where {U <: MortonUnsigned}
+
     # Compute exclusive bounds [xmin, ymin, zmin], [xmax, ymax, zmax].
-    # TODO: see uint_encode from Base.Sort, scaling might be better
     mins, maxs = bounding_volumes_extrema(bounding_volumes)
-    morton_encode!(mortons, bounding_volumes, mins, maxs)
+    morton_encode!(mortons, bounding_volumes, mins, maxs, num_threads=num_threads)
     nothing
 end
 
@@ -220,9 +225,14 @@ end
 Encode the centers of some `bounding_volumes` as Morton codes of type `U <: `
 [`MortonUnsigned`](@ref). See [`morton_encode!`](@ref) for full details. 
 """
-function morton_encode(bounding_volumes, ::Type{U}=UInt) where {U <: MortonUnsigned}
+function morton_encode(
+    bounding_volumes,
+    ::Type{U}=UInt;
+    num_threads=Threads.nthreads(),
+) where {U <: MortonUnsigned}
+
     # Pre-allocate vector of morton codes
     mortons = similar(bounding_volumes, U)
-    morton_encode!(mortons, bounding_volumes)
+    morton_encode!(mortons, bounding_volumes, num_threads=num_threads)
     mortons
 end

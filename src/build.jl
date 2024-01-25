@@ -28,7 +28,8 @@ Tree Level          Nodes & Leaves               Build Up    Traverse Down
         bounding_volumes::AbstractVector{L},
         node_type::Type{N}=L,
         morton_type::Type{U}=UInt,
-        built_level::Integer=1,
+        built_level::Integer=1;
+        num_threads=Threads.nthreads(),
     ) where {L, N, U <: MortonUnsigned}
 
 # Fields
@@ -134,7 +135,8 @@ function BVH(
     bounding_volumes::AbstractVector{L},
     node_type::Type{N}=L,
     morton_type::Type{U}=UInt,
-    built_level=1,
+    built_level=1;
+    num_threads=Threads.nthreads(),
 ) where {L, N, U <: MortonUnsigned}
 
     # Ensure correctness
@@ -165,7 +167,7 @@ function BVH(
 
     # Compute morton codes for the bounding volumes
     mortons = similar(bounding_volumes, morton_type)
-    @inbounds morton_encode!(mortons, bounding_volumes)
+    @inbounds morton_encode!(mortons, bounding_volumes, num_threads=num_threads)
 
     # Compute indices that sort codes along the Z-curve - closer objects have closer Morton codes
     # TODO: check parallel SyncSort or ThreadsX.QuickSort
@@ -176,7 +178,7 @@ function BVH(
 
     # Aggregate bounding volumes up to root
     if tree.real_nodes >= 2
-        aggregate_oibvh!(bvh_nodes, bounding_volumes, tree, order, built_ilevel)
+        aggregate_oibvh!(bvh_nodes, bounding_volumes, tree, order, built_ilevel, num_threads)
     end
 
     BVH(built_ilevel, tree, bvh_nodes, bounding_volumes, order)
@@ -184,14 +186,14 @@ end
 
 
 # Build ImplicitBVH nodes above the leaf-level from the bottom up, inplace
-function aggregate_oibvh!(bvh_nodes, bvh_leaves, tree, order, built_level=1)
+function aggregate_oibvh!(bvh_nodes, bvh_leaves, tree, order, built_level, num_threads)
 
     # Special case: aggregate level above leaves - might have different node types
-    aggregate_last_level!(bvh_nodes, bvh_leaves, tree, order)
+    aggregate_last_level!(bvh_nodes, bvh_leaves, tree, order, num_threads)
 
     level = tree.levels - 2
     while level >= built_level
-        aggregate_level!(bvh_nodes, level, tree)
+        aggregate_level!(bvh_nodes, level, tree, num_threads)
         level -= 1
     end
 
@@ -243,7 +245,7 @@ end
 end
 
 
-@inline function aggregate_last_level!(bvh_nodes, bvh_leaves, tree, order)
+@inline function aggregate_last_level!(bvh_nodes, bvh_leaves, tree, order, num_threads)
     # Memory index of first node on this level (i.e. first above leaf-level)
     level = tree.levels - 1
     start_pos = memory_index(tree, pow2(level - 1))
@@ -256,7 +258,7 @@ end
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
-    tp = TaskPartitioner(num_nodes, Threads.nthreads(), 100)
+    tp = TaskPartitioner(num_nodes, num_threads, 100)
     if tp.num_tasks == 1
         @inbounds aggregate_last_level_range!(
             bvh_nodes, bvh_leaves, order,
@@ -303,7 +305,7 @@ end
 end
 
 
-@inline function aggregate_level!(bvh_nodes, level, tree)
+@inline function aggregate_level!(bvh_nodes, level, tree, num_threads)
     # Memory index of first node on this level
     start_pos = memory_index(tree, pow2(level - 1))
 
@@ -316,7 +318,7 @@ end
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
-    tp = TaskPartitioner(num_nodes, Threads.nthreads(), 100)
+    tp = TaskPartitioner(num_nodes, num_threads, 100)
     if tp.num_tasks == 1
         @inbounds aggregate_level_range!(
             bvh_nodes, start_pos,

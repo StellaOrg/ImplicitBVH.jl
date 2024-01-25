@@ -22,6 +22,6 @@ include("morton.jl")
 include("implicit_tree.jl")
 include("bounding_volumes.jl")
 include("build.jl")
-include("traverse.jl")
+include("traverse/traverse.jl")
 
 end     # module ImplicitBVH

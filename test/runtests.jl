@@ -655,19 +655,18 @@ end
 
 @testset "bvh_pair_equivalent_randomised" begin
     # Random bounding volumes of different densities; BSphere leaves, BSphere nodes
-    # TODO: test different start levels
     Random.seed!(42)
     for num_entities in 1:11:200
 
         # Test different starting levels
         tree = ImplicitTree(num_entities)
-        for start_level in 1:tree.levels
+        for start_level1 in 1:tree.levels, start_level2 in 1:tree.levels
             bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
             bvh = BVH(bvs)
 
             # First traverse the BVH normally, then as if we had two different BVHs
-            contacts1 = traverse(bvh, start_level).contacts
-            contacts2 = traverse(bvh, bvh, start_level).contacts
+            contacts1 = traverse(bvh, start_level1).contacts
+            contacts2 = traverse(bvh, bvh, start_level1, start_level2).contacts
 
             # The second one should have the same contacts as contacts1, plus contacts between the
             # same BVs and reverse order; e.g. if contacts1=[(1, 2), (2, 3)], then
@@ -690,13 +689,13 @@ end
 
         # Test different starting levels
         tree = ImplicitTree(num_entities)
-        for start_level in 1:tree.levels
+        for start_level1 in 1:tree.levels, start_level2 in 1:tree.levels
             bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
             bvh = BVH(bvs, BBox{Float64})
 
             # First traverse the BVH normally, then as if we had two different BVHs
-            contacts1 = traverse(bvh, start_level).contacts
-            contacts2 = traverse(bvh, bvh, start_level).contacts
+            contacts1 = traverse(bvh, start_level1).contacts
+            contacts2 = traverse(bvh, bvh, start_level1, start_level2).contacts
 
             # The second one should have the same contacts as contacts1, plus contacts between the
             # same BVs and reverse order; e.g. if contacts1=[(1, 2), (2, 3)], then
@@ -726,9 +725,8 @@ end
         # Test different starting levels
         tree1 = ImplicitTree(num_entities1)
         tree2 = ImplicitTree(num_entities2)
-        min_levels = tree1.levels < tree2.levels ? tree1.levels : tree2.levels
 
-        for start_level in 1:min_levels - 1
+        for start_level1 in 1:tree1.levels, start_level2 in 1:tree2.levels
             bvs1 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities1])
             bvs2 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities2])
 
@@ -745,7 +743,7 @@ end
             # ImplicitBVH-based contact detection
             bvh1 = BVH(bvs1)
             bvh2 = BVH(bvs2)
-            traversal = traverse(bvh1, bvh2, start_level)
+            traversal = traverse(bvh1, bvh2, start_level1, start_level2)
             bvh_contacts = traversal.contacts
 
             # Ensure ImplicitBVH finds same contacts as checking all possible pairs
