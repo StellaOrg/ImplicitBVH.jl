@@ -1,7 +1,7 @@
 name = "ImplicitBVH"
 uuid = "932a18dc-bb55-4cd5-bdd6-1368ec9cea29"
 authors = ["Andrei Leonard Nicusan"]
-version = "0.4.0"
+version = "0.4.1"
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
