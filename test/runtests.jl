@@ -360,6 +360,9 @@ end
     bvh = BVH(bvs)
     @test length(bvh.nodes) == 6
 
+    # Test the default start levels
+    @test default_start_level(bvh) == default_start_level(length(bvs))
+
     # Level 3
     @test bvh.nodes[4].x ≈ (bvs[1] + bvs[2]).x      # First two BVs are paired
     @test bvh.nodes[5].x ≈ (bvs[3] + bvs[4]).x      # Next two BVs are paired
@@ -431,6 +434,9 @@ end
     bvh = BVH(bvs)
     @test length(bvh.nodes) == 6
 
+    # Test the default start levels
+    @test default_start_level(bvh) == default_start_level(length(bvs))
+
     # Level 3
     center = ImplicitBVH.center
     @test center(bvh.nodes[4]) ≈ center(bvs[1] + bvs[2])      # First two BVs are paired
@@ -475,6 +481,9 @@ end
     # 8   9   10 11   12 13v  14v  15v      4
     bvh = BVH(bvs)
     @test length(bvh.nodes) == 6
+
+    # Test the default start levels
+    @test default_start_level(bvh) == default_start_level(length(bvs))
 
     # Level 3
     @test bvh.nodes[4].x ≈ (bvs[3] + bvs[1]).x      # First two BVs are paired
@@ -546,6 +555,9 @@ end
     bvh = BVH(bvs)
     @test length(bvh.nodes) == 6
 
+    # Test the default start levels
+    @test default_start_level(bvh) == default_start_level(length(bvs))
+
     # Level 3
     center = ImplicitBVH.center
     @test center(bvh.nodes[4]) ≈ center(bvs[3] + bvs[1])      # First two BVs are paired
@@ -597,6 +609,9 @@ end
             traversal = traverse(bvh, start_level)
             bvh_contacts = traversal.contacts
 
+            # Test the default start levels
+            @test default_start_level(bvh) == default_start_level(length(bvs))
+
             # Ensure ImplicitBVH finds same contacts as checking all possible pairs
             @test length(brute_contacts) == length(bvh_contacts)
             @test all(brute_contact in bvh_contacts for brute_contact in brute_contacts)
@@ -625,6 +640,9 @@ end
             bvh = BVH(bvs, BBox{Float64})
             traversal = traverse(bvh, start_level)
             bvh_contacts = traversal.contacts
+
+            # Test the default start levels
+            @test default_start_level(bvh) == default_start_level(length(bvs))
 
             # Ensure ImplicitBVH finds same contacts as checking all possible pairs
             @test length(brute_contacts) == length(bvh_contacts)
@@ -664,6 +682,9 @@ end
             bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
             bvh = BVH(bvs)
 
+            # Test the default start levels
+            @test default_start_level(bvh) == default_start_level(length(bvs))
+
             # First traverse the BVH normally, then as if we had two different BVHs
             contacts1 = traverse(bvh, start_level1).contacts
             contacts2 = traverse(bvh, bvh, start_level1, start_level2).contacts
@@ -692,6 +713,9 @@ end
         for start_level1 in 1:tree.levels, start_level2 in 1:tree.levels
             bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
             bvh = BVH(bvs, BBox{Float64})
+
+            # Test the default start levels
+            @test default_start_level(bvh) == default_start_level(length(bvs))
 
             # First traverse the BVH normally, then as if we had two different BVHs
             contacts1 = traverse(bvh, start_level1).contacts
