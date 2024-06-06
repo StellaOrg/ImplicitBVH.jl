@@ -158,6 +158,13 @@ end
     c = a + a
     @test c.x ≈ a.x
     @test c.r ≈ a.r
+
+    # Translating
+    a = BSphere((0., 0., 0.), 0.5)
+    dx = (1., 1., 1.)
+    b = ImplicitBVH.translate(a, dx)
+    @test b.x ≈ dx
+    @test b.r == a.r
 end
 
 
@@ -221,6 +228,13 @@ end
     c = a + a
     @test c.lo ≈ a.lo
     @test c.up ≈ a.up
+
+    # Translating
+    a = BBox((0., 0., 0.), (1., 1., 1.))
+    dx = (1., 1., 1.)
+    b = ImplicitBVH.translate(a, dx)
+    @test b.lo ≈ dx
+    @test b.up ≈ a.up .+ dx
 end
 
 
@@ -341,6 +355,8 @@ end
 
 @testset "bvh_single_bsphere_small_ordered" begin
 
+    using ImplicitBVH: center
+
     # Simple, ordered bounding spheres traversal test
     bvs = [
         BSphere([0., 0, 0], 0.5),
@@ -389,7 +405,6 @@ end
     @test length(bvh.nodes) == 6
 
     # Level 3
-    center = ImplicitBVH.center
     @test center(bvh.nodes[4]) ≈ center(leaf(bvs[1], bvs[2]))      # First two BVs are paired
     @test center(bvh.nodes[5]) ≈ center(leaf(bvs[3], bvs[4]))      # Next two BVs are paired
     @test center(bvh.nodes[6]) ≈ center(bvs[5])                    # Last BV has no pair
@@ -408,6 +423,22 @@ end
     @test (4, 5) in traversal.contacts
     @test (1, 2) in traversal.contacts
     @test (2, 3) in traversal.contacts
+
+    # Translate BVH
+    bvh = BVH(bvs)
+    new_positions = [
+        1. 0 0
+        1. 0 2
+        1. 0 4
+        1. 0 6
+        1. 0 8
+    ]'
+    translated = BVH(bvh, new_positions)
+    @test center(translated.leaves[1]) ≈ (1, 0, 0)
+    @test center(translated.leaves[2]) ≈ (1, 0, 2)
+    @test center(translated.leaves[3]) ≈ (1, 0, 4)
+    @test center(translated.leaves[4]) ≈ (1, 0, 6)
+    @test center(translated.leaves[5]) ≈ (1, 0, 8)
 end
 
 

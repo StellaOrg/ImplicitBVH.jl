@@ -19,6 +19,15 @@ function center end
 
 
 """
+    translate(b::BSphere{T}, dx) where T
+    translate(b::BBox{T}, dx) where T
+
+Get a new bounding volume translated by dx; dx can be any iterable with 3 elements.
+"""
+function translate end
+
+
+"""
     $(TYPEDEF)
 
 Bounding sphere, highly optimised for computing bounding volumes for triangles and merging into
@@ -154,6 +163,16 @@ end
 center(b::BSphere) = b.x
 
 
+# Overloaded translate function
+function translate(b::BSphere{T}, dx) where T
+    @assert length(dx) == 3
+    new_center = (b.x[1] + T(dx[1]),
+                  b.x[2] + T(dx[2]),
+                  b.x[3] + T(dx[3]))
+    BSphere{T}(new_center, b.r)
+end
+
+
 # Merge two bounding spheres
 function BSphere{T}(a::BSphere, b::BSphere) where T
     length = dist3(a.x, b.x)
@@ -286,6 +305,20 @@ end
 center(b::BBox{T}) where T = (T(0.5) * (b.lo[1] + b.up[1]),
                               T(0.5) * (b.lo[2] + b.up[2]),
                               T(0.5) * (b.lo[3] + b.up[3]))
+
+
+# Overloaded translate function
+function translate(b::BBox{T}, dx) where T
+    @assert length(dx) == 3
+    dx1, dx2, dx3 = T(dx[1]), T(dx[2]), T(dx[3])
+    new_lo = (b.lo[1] + dx1,
+              b.lo[2] + dx2,
+              b.lo[3] + dx3)
+    new_up = (b.up[1] + dx1,
+              b.up[2] + dx2,
+              b.up[3] + dx3)
+    BBox{T}(new_lo, new_up)
+end
 
 
 # Merge two bounding boxes

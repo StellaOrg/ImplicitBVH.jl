@@ -32,10 +32,18 @@ Tree Level          Nodes & Leaves               Build Up    Traverse Down
         num_threads=Threads.nthreads(),
     ) where {L, N, U <: MortonUnsigned}
 
+    function BVH(
+        prev::BVH,
+        new_positions::AbstractMatrix,
+        built_level=1;
+        num_threads=Threads.nthreads(),
+    )
+
 # Fields
 - `tree::`[`ImplicitTree`](@ref)`{Int}`
 - `nodes::VN <: AbstractVector`
 - `leaves::VL <: AbstractVector`
+- `mortons::VM <: AbstractVector`
 - `order::VO <: AbstractVector`
 - `built_level::Int`
 
@@ -104,18 +112,26 @@ cache:
 bvh = BVH(bounding_spheres, BBox{Float32}, UInt32, 2)
 traversal = traverse(bvh, 3, traversal)
 ```
+
+Update previous BVH bounding volumes' positions and rebuild BVH *reusing previous memory*:
+
+```julia
+new_positions = rand(3, 5)
+bvh_rebuilt = BVH(bvh, new_positions)
+```
 """
-struct BVH{VN <: AbstractVector, VL <: AbstractVector, VO <: AbstractVector}
+struct BVH{VN <: AbstractVector, VL <: AbstractVector, VM <: AbstractVector, VO <: AbstractVector}
     built_level::Int
     tree::ImplicitTree{Int}
     nodes::VN
     leaves::VL
+    mortons::VM
     order::VO
 end
 
 
 # Custom pretty-printing
-function Base.show(io::IO, b::BVH{VN, VL, VO}) where {VN, VL, VO}
+function Base.show(io::IO, b::BVH{VN, VL, VM, VO}) where {VN, VL, VM, VO}
     print(
         io,
         """
@@ -124,13 +140,14 @@ function Base.show(io::IO, b::BVH{VN, VL, VO}) where {VN, VL, VO}
           tree:        $(b.tree)
           nodes:       $(VN)($(size(b.nodes)))
           leaves:      $(VL)($(size(b.leaves)))
+          mortons:     $(VM)($(size(b.mortons)))
           order:       $(VO)($(size(b.order)))
         """
     )
 end
 
 
-
+# Normal constructor which builds BVH
 function BVH(
     bounding_volumes::AbstractVector{L},
     node_type::Type{N}=L,
@@ -154,16 +171,7 @@ function BVH(
     tree = ImplicitTree{Int}(numbv)
 
     # Compute level up to which tree should be built
-    if built_level isa Integer
-        @assert 1 <= built_level <= tree.levels
-        built_ilevel = Int(built_level)
-    elseif built_level isa AbstractFloat
-        @assert 0 <= built_level <= 1
-        built_ilevel = round(Int, tree.levels + (1 - tree.levels) * built_level)
-    else
-        throw(TypeError(:BVH, "built_level (the level to build BVH up to)",
-                        Union{Integer, AbstractFloat}, typeof(built_level)))
-    end
+    built_ilevel = compute_build_level(tree, built_level)
 
     # Compute morton codes for the bounding volumes
     mortons = similar(bounding_volumes, morton_type)
@@ -176,14 +184,82 @@ function BVH(
     # Pre-allocate vector of bounding volumes for the real nodes above the bottom level
     bvh_nodes = similar(bounding_volumes, N, tree.real_nodes - tree.real_leaves)
 
-    # Aggregate bounding volumes up to root
+    # Aggregate bounding volumes up to built_ilevel
     if tree.real_nodes >= 2
         aggregate_oibvh!(bvh_nodes, bounding_volumes, tree, order, built_ilevel, num_threads)
     end
 
-    BVH(built_ilevel, tree, bvh_nodes, bounding_volumes, order)
+    BVH(built_ilevel, tree, bvh_nodes, bounding_volumes, mortons, order)
 end
 
+
+# Copy constructor reusing previous memory; previous bounding volumes are moved to new_positions.
+function BVH(
+    prev::BVH,
+    new_positions::AbstractMatrix,
+    built_level=1;
+    num_threads=Threads.nthreads(),
+)
+
+    # Ensure correctness
+    @assert size(new_positions, 1) == 3 "new_positions need 3D coordinates on first axis"
+    @assert size(new_positions, 2) == length(prev.leaves) "Different number of new_positions"
+    @assert firstindex(new_positions, 1) == 1 "BVH vector types must be 1-indexed"
+    @assert firstindex(new_positions, 2) == 1 "BVH vector types must be 1-indexed"
+
+    # Extract previous BVH fields
+    tree = prev.tree
+    bvh_nodes = prev.nodes
+    bounding_volumes = prev.leaves
+    mortons = prev.mortons
+    order = prev.order
+
+    # Compute level up to which tree should be built
+    built_ilevel = compute_build_level(tree, built_level)
+
+    # Move the centres of previous bounding volumes to the coordinates of new_positions; ensure we
+    # use the same type as in prev
+    for i in axes(new_positions, 2)
+        bv = bounding_volumes[i]
+        c = center(bv)
+        T = eltype(c)
+        dx = (T(new_positions[1, i]) - c[1],
+              T(new_positions[2, i]) - c[2],
+              T(new_positions[3, i]) - c[3])
+        bounding_volumes[i] = translate(bv, dx)
+    end
+
+    # Recompute Morton codes
+    @inbounds morton_encode!(mortons, bounding_volumes, num_threads=num_threads)
+
+    # Compute indices that sort codes along the Z-curve - closer objects have closer Morton codes
+    sortperm!(order, mortons)
+
+    # Aggregate bounding volumes up to built_ilevel
+    if tree.real_nodes >= 2
+        aggregate_oibvh!(bvh_nodes, bounding_volumes, tree, order, built_ilevel, num_threads)
+    end
+
+    BVH(built_ilevel, tree, bvh_nodes, bounding_volumes, mortons, order)
+end
+
+
+# Compute level up to which tree should be built
+function compute_build_level(tree, built_level)
+
+    if built_level isa Integer
+        @assert 1 <= built_level <= tree.levels
+        built_ilevel = Int(built_level)
+    elseif built_level isa AbstractFloat
+        @assert 0 <= built_level <= 1
+        built_ilevel = round(Int, tree.levels + (1 - tree.levels) * built_level)
+    else
+        throw(TypeError(:BVH, "built_level (the level to build BVH up to)",
+                        Union{Integer, AbstractFloat}, typeof(built_level)))
+    end
+
+    built_ilevel
+end
 
 # Build ImplicitBVH nodes above the leaf-level from the bottom up, inplace
 function aggregate_oibvh!(bvh_nodes, bvh_leaves, tree, order, built_level, num_threads)

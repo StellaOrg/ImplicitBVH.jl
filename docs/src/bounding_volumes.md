@@ -11,3 +11,9 @@ ImplicitBVH.BSphere
 ImplicitBVH.iscontact
 ImplicitBVH.center
 ```
+
+## Miscellaneous
+
+```@docs
+ImplicitBVH.translate
+```

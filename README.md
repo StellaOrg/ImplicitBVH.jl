@@ -82,6 +82,13 @@ bvh = BVH(bounding_spheres, BBox{Float32}, UInt32, 2)
 traversal = traverse(bvh, 3, traversal)
 ```
 
+Update previous BVH bounding volumes' positions and rebuild BVH *reusing previous memory*:
+
+```julia
+new_positions = rand(3, 5)
+bvh_rebuilt = BVH(bvh, new_positions)
+```
+
 Compute contacts between two different BVH trees (e.g. two different robotic parts):
 
 ```julia
