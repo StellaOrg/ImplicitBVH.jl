@@ -153,7 +153,7 @@ function BVH(
     node_type::Type{N}=L,
     morton_type::Type{U}=UInt,
     built_level=1;
-    num_threads=Threads.nthreads(),
+    options=BVHOptions(),
 ) where {L, N, U <: MortonUnsigned}
 
     # Ensure correctness
@@ -175,18 +175,22 @@ function BVH(
 
     # Compute morton codes for the bounding volumes
     mortons = similar(bounding_volumes, morton_type)
-    @inbounds morton_encode!(mortons, bounding_volumes, num_threads=num_threads)
+    @inbounds morton_encode!(mortons, bounding_volumes, options)
 
     # Compute indices that sort codes along the Z-curve - closer objects have closer Morton codes
-    # TODO: check parallel SyncSort or ThreadsX.QuickSort
-    order = sortperm(mortons)
+    order = similar(mortons, Int)
+    if mortons isa AbstractGPUVector
+        AK.merge_sortperm_lowmem!(order, mortons, block_size=options.block_size)
+    else
+        sortperm!(order, mortons)
+    end
 
     # Pre-allocate vector of bounding volumes for the real nodes above the bottom level
     bvh_nodes = similar(bounding_volumes, N, tree.real_nodes - tree.real_leaves)
 
     # Aggregate bounding volumes up to built_ilevel
     if tree.real_nodes >= 2
-        aggregate_oibvh!(bvh_nodes, bounding_volumes, tree, order, built_ilevel, num_threads)
+        aggregate_oibvh!(bvh_nodes, bounding_volumes, tree, order, built_ilevel, options)
     end
 
     BVH(built_ilevel, tree, bvh_nodes, bounding_volumes, mortons, order)
@@ -198,7 +202,7 @@ function BVH(
     prev::BVH,
     new_positions::AbstractMatrix,
     built_level=1;
-    num_threads=Threads.nthreads(),
+    options=BVHOptions(),
 )
 
     # Ensure correctness
@@ -219,25 +223,46 @@ function BVH(
 
     # Move the centres of previous bounding volumes to the coordinates of new_positions; ensure we
     # use the same type as in prev
-    for i in axes(new_positions, 2)
+    @inbounds @inline function _move_bv!(bounding_volumes, new_positions, i)
         bv = bounding_volumes[i]
         c = center(bv)
         T = eltype(c)
-        dx = (T(new_positions[1, i]) - c[1],
-              T(new_positions[2, i]) - c[2],
-              T(new_positions[3, i]) - c[3])
-        bounding_volumes[i] = translate(bv, dx)
+
+        # Special-case BSphere which can be translated by just overwriting centre
+        if bv isa BSphere
+            new_x = (T(new_positions[1, i]), T(new_positions[2, i]), T(new_positions[3, i]))
+            bounding_volumes[i] = BSphere{T}(new_x, bv.r)
+        else
+            dx = (T(new_positions[1, i]) - c[1],
+                  T(new_positions[2, i]) - c[2],
+                  T(new_positions[3, i]) - c[3])
+            bounding_volumes[i] = translate(bv, dx)
+        end
+    end
+
+    foreachindex(
+        bounding_volumes,
+        block_size=options.block_size,
+        scheduler=options.scheduler,
+        max_tasks=options.num_threads,
+        min_elems=options.min_boundings_per_thread,
+    ) do i
+        _move_bv!(bounding_volumes, new_positions, i)
     end
 
     # Recompute Morton codes
-    @inbounds morton_encode!(mortons, bounding_volumes, num_threads=num_threads)
+    @inbounds morton_encode!(mortons, bounding_volumes, options)
 
     # Compute indices that sort codes along the Z-curve - closer objects have closer Morton codes
-    sortperm!(order, mortons)
+    if mortons isa AbstractGPUVector
+        AK.merge_sortperm_lowmem!(order, mortons, block_size=options.block_size)
+    else
+        sortperm!(order, mortons)
+    end
 
     # Aggregate bounding volumes up to built_ilevel
     if tree.real_nodes >= 2
-        aggregate_oibvh!(bvh_nodes, bounding_volumes, tree, order, built_ilevel, num_threads)
+        aggregate_oibvh!(bvh_nodes, bounding_volumes, tree, order, built_ilevel, options)
     end
 
     BVH(built_ilevel, tree, bvh_nodes, bounding_volumes, mortons, order)
@@ -262,14 +287,14 @@ function compute_build_level(tree, built_level)
 end
 
 # Build ImplicitBVH nodes above the leaf-level from the bottom up, inplace
-function aggregate_oibvh!(bvh_nodes, bvh_leaves, tree, order, built_level, num_threads)
+function aggregate_oibvh!(bvh_nodes, bvh_leaves, tree, order, built_level, options)
 
     # Special case: aggregate level above leaves - might have different node types
-    aggregate_last_level!(bvh_nodes, bvh_leaves, tree, order, num_threads)
+    aggregate_last_level!(bvh_nodes, bvh_leaves, tree, order, options)
 
     level = tree.levels - 2
     while level >= built_level
-        aggregate_level!(bvh_nodes, level, tree, num_threads)
+        aggregate_level!(bvh_nodes, level, tree, options)
         level -= 1
     end
 
@@ -277,43 +302,40 @@ function aggregate_oibvh!(bvh_nodes, bvh_leaves, tree, order, built_level, num_t
 end
 
 
-@inline function aggregate_last_level_range!(
+@inline @inbounds function _aggregate_last_level_at!(
     bvh_nodes,
     bvh_leaves,
     order,
     start_pos,
     num_nodes_next,
-    irange,
+    i,
 )
+    lchild_implicit = 2i - 1
+    rchild_implicit = 2i
+
+    rchild_virtual = rchild_implicit > num_nodes_next
+
     # The bvh_nodes are not sorted! Instead, we have the indices permutation in `order`
-    @inbounds for i in irange[1]:irange[2]
+    lchild_index = order[lchild_implicit]
+    if !rchild_virtual
+        rchild_index = order[rchild_implicit]
+    end
 
-        lchild_implicit = 2i - 1
-        rchild_implicit = 2i
-
-        rchild_virtual = rchild_implicit > num_nodes_next
-
-        lchild_index = order[lchild_implicit]
-        if !rchild_virtual
-            rchild_index = order[rchild_implicit]
-        end
-
-        # If using different node type than leaf type (e.g. BSphere leaves and BBox nodes) do
-        # conversion; this conditional is optimised away at compile-time
-        if eltype(bvh_nodes) === eltype(bvh_leaves)
-            # If right child is virtual, set the parent BV to the left child one; otherwise merge
-            if rchild_virtual
-                bvh_nodes[start_pos - 1 + i] = bvh_leaves[lchild_index]
-            else
-                bvh_nodes[start_pos - 1 + i] = bvh_leaves[lchild_index] + bvh_leaves[rchild_index]
-            end
+    # If using different node type than leaf type (e.g. BSphere leaves and BBox nodes) do
+    # conversion; this conditional is optimised away at compile-time
+    if eltype(bvh_nodes) === eltype(bvh_leaves)
+        # If right child is virtual, set the parent BV to the left child one; otherwise merge
+        if rchild_virtual
+            bvh_nodes[start_pos - 1 + i] = bvh_leaves[lchild_index]
         else
-            if rchild_virtual
-                bvh_nodes[start_pos - 1 + i] = eltype(bvh_nodes)(bvh_leaves[lchild_index])
-            else
-                bvh_nodes[start_pos - 1 + i] = eltype(bvh_nodes)(bvh_leaves[lchild_index],
-                                                                 bvh_leaves[rchild_index])
-            end
+            bvh_nodes[start_pos - 1 + i] = bvh_leaves[lchild_index] + bvh_leaves[rchild_index]
+        end
+    else
+        if rchild_virtual
+            bvh_nodes[start_pos - 1 + i] = eltype(bvh_nodes)(bvh_leaves[lchild_index])
+        else
+            bvh_nodes[start_pos - 1 + i] = eltype(bvh_nodes)(bvh_leaves[lchild_index],
+                                                             bvh_leaves[rchild_index])
         end
     end
 
@@ -321,7 +343,7 @@ end
 end
 
 
-@inline function aggregate_last_level!(bvh_nodes, bvh_leaves, tree, order, num_threads)
+@inline function aggregate_last_level!(bvh_nodes, bvh_leaves, tree, order, options)
     # Memory index of first node on this level (i.e. first above leaf-level)
     level = tree.levels - 1
     start_pos = memory_index(tree, pow2(level - 1))
@@ -332,56 +354,47 @@ end
     # Merge all pairs of children below this level
     num_nodes_next = pow2(level) - tree.virtual_leaves >> (tree.levels - (level + 1))
 
-    # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
-    # is needed, inline call
-    tp = TaskPartitioner(num_nodes, num_threads, 100)
-    if tp.num_tasks == 1
-        @inbounds aggregate_last_level_range!(
+    # Multithreaded CPU / GPU implementation
+    foreachindex(
+        1:num_nodes, get_backend(bvh_nodes),
+        block_size=options.block_size,
+        scheduler=options.scheduler,
+        max_tasks=options.num_threads,
+        min_elems=options.min_boundings_per_thread,
+    ) do i
+        _aggregate_last_level_at!(
             bvh_nodes, bvh_leaves, order,
-            start_pos, num_nodes_next, (1, num_nodes)
+            start_pos, num_nodes_next, i,
         )
-    else
-        tasks = Vector{Task}(undef, tp.num_tasks)
-        for i in 1:tp.num_tasks
-            @inbounds tasks[i] = Threads.@spawn aggregate_last_level_range!(
-                bvh_nodes, bvh_leaves, order,
-                start_pos, num_nodes_next, tp[i],
-            )
-        end
-        for i in 1:tp.num_tasks
-            wait(tasks[i])
-        end
     end
 
     nothing
 end
 
 
-@inline function aggregate_level_range!(
+@inline @inbounds function _aggregate_level_at!(
     bvh_nodes,
     start_pos,
     start_pos_next,
     num_nodes_next,
-    irange,
+    i,
 )
-    @inbounds for i in irange[1]:irange[2]
-        lchild_index = start_pos_next + 2i - 2
-        rchild_index = start_pos_next + 2i - 1
+    lchild_index = start_pos_next + 2i - 2
+    rchild_index = start_pos_next + 2i - 1
 
-        if rchild_index > start_pos_next + num_nodes_next - 1
-            # If right child is virtual, set the parent BV to the child one
-            bvh_nodes[start_pos - 1 + i] = bvh_nodes[lchild_index]
-        else
-            # Merge children bounding volumes
-            bvh_nodes[start_pos - 1 + i] = bvh_nodes[lchild_index] + bvh_nodes[rchild_index]
-        end
+    if rchild_index > start_pos_next + num_nodes_next - 1
+        # If right child is virtual, set the parent BV to the child one
+        bvh_nodes[start_pos - 1 + i] = bvh_nodes[lchild_index]
+    else
+        # Merge children bounding volumes
+        bvh_nodes[start_pos - 1 + i] = bvh_nodes[lchild_index] + bvh_nodes[rchild_index]
     end
 
     nothing
 end
 
 
-@inline function aggregate_level!(bvh_nodes, level, tree, num_threads)
+@inline function aggregate_level!(bvh_nodes, level, tree, options)
     # Memory index of first node on this level
     start_pos = memory_index(tree, pow2(level - 1))
 
@@ -392,26 +405,17 @@ end
     start_pos_next = memory_index(tree, pow2(level))
     num_nodes_next = pow2(level) - tree.virtual_leaves >> (tree.levels - (level + 1))
 
-    # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
-    # is needed, inline call
-    tp = TaskPartitioner(num_nodes, num_threads, 100)
-    if tp.num_tasks == 1
-        @inbounds aggregate_level_range!(
-            bvh_nodes, start_pos,
-            start_pos_next, num_nodes_next, (1, num_nodes),
-        )
-    else
-        tasks = Vector{Task}(undef, tp.num_tasks)
-        for i in 1:tp.num_tasks
-            @inbounds tasks[i] = Threads.@spawn aggregate_level_range!(
-                bvh_nodes, start_pos,
-                start_pos_next, num_nodes_next, tp[i],
-            )
-        end
-        for i in 1:tp.num_tasks
-            wait(tasks[i])
-        end
+    # Multithreaded CPU / GPU implementation
+    foreachindex(
+        1:num_nodes, get_backend(bvh_nodes),
+        block_size=options.block_size,
+        scheduler=options.scheduler,
+        max_tasks=options.num_threads,
+        min_elems=options.min_boundings_per_thread,
+    ) do i
+        _aggregate_level_at!(bvh_nodes, start_pos, start_pos_next, num_nodes_next, i)
     end
 
     nothing
 end
+

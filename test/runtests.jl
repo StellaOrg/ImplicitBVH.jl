@@ -423,22 +423,6 @@ end
     @test (4, 5) in traversal.contacts
     @test (1, 2) in traversal.contacts
     @test (2, 3) in traversal.contacts
-
-    # Translate BVH
-    bvh = BVH(bvs)
-    new_positions = [
-        1. 0 0
-        1. 0 2
-        1. 0 4
-        1. 0 6
-        1. 0 8
-    ]'
-    translated = BVH(bvh, new_positions)
-    @test center(translated.leaves[1]) ≈ (1, 0, 0)
-    @test center(translated.leaves[2]) ≈ (1, 0, 2)
-    @test center(translated.leaves[3]) ≈ (1, 0, 4)
-    @test center(translated.leaves[4]) ≈ (1, 0, 6)
-    @test center(translated.leaves[5]) ≈ (1, 0, 8)
 end
 
 
@@ -609,6 +593,64 @@ end
     @test (4, 5) in traversal.contacts
     @test (1, 3) in traversal.contacts
     @test (1, 2) in traversal.contacts
+end
+
+
+
+
+@testset "bvh_translate" begin
+
+    using ImplicitBVH: center
+
+    # Simple, ordered bounding spheres traversal test
+    bvs = [
+        BSphere([0., 0, 0], 0.5),
+        BSphere([0., 0, 1], 0.6),
+        BSphere([0., 0, 2], 0.5),
+        BSphere([0., 0, 3], 0.4),
+        BSphere([0., 0, 4], 0.6),
+    ]
+
+    # Translate BVH made of BSphere
+    bvh = BVH(bvs)
+    new_positions = [
+        1. 0 0
+        1. 0 2
+        1. 0 4
+        1. 0 6
+        1. 0 8
+    ]'
+    translated = BVH(bvh, new_positions)
+    @test center(translated.leaves[1]) ≈ (1, 0, 0)
+    @test center(translated.leaves[2]) ≈ (1, 0, 2)
+    @test center(translated.leaves[3]) ≈ (1, 0, 4)
+    @test center(translated.leaves[4]) ≈ (1, 0, 6)
+    @test center(translated.leaves[5]) ≈ (1, 0, 8)
+
+    # Simple, ordered bounding box traversal test
+    bvs = [
+        BBox(BSphere([0., 0, 0], 0.5)),
+        BBox(BSphere([0., 0, 1], 0.6)),
+        BBox(BSphere([0., 0, 2], 0.5)),
+        BBox(BSphere([0., 0, 3], 0.4)),
+        BBox(BSphere([0., 0, 4], 0.6)),
+    ]
+
+    # Translate BVH made of BBox
+    bvh = BVH(bvs)
+    new_positions = [
+        1. 0 0
+        1. 0 2
+        1. 0 4
+        1. 0 6
+        1. 0 8
+    ]'
+    translated = BVH(bvh, new_positions)
+    @test center(translated.leaves[1]) ≈ (1, 0, 0)
+    @test center(translated.leaves[2]) ≈ (1, 0, 2)
+    @test center(translated.leaves[3]) ≈ (1, 0, 4)
+    @test center(translated.leaves[4]) ≈ (1, 0, 6)
+    @test center(translated.leaves[5]) ≈ (1, 0, 8)
 end
 
 
@@ -842,3 +884,36 @@ end
         end
     end
 end
+
+
+# GPU tests
+# Pass command-line argument to test suite to install the right backend, e.g.
+#   julia> import Pkg
+#   julia> Pkg.test(test_args=["--oneAPI"])
+import Pkg
+
+if "--CUDA" in ARGS
+    Pkg.add("CUDA")
+    using CUDA
+    const backend = CUDABackend()
+    include(joinpath(@__DIR__, "gputests.jl"))
+
+elseif "--oneAPI" in ARGS
+    Pkg.add("oneAPI")
+    using oneAPI
+    const backend = oneAPIBackend()
+    include(joinpath(@__DIR__, "gputests.jl"))
+
+elseif "--AMDGPU" in ARGS
+    Pkg.add("AMDGPU")
+    using AMDGPU
+    const backend = ROCBackend()
+    include(joinpath(@__DIR__, "gputests.jl"))
+
+elseif "--Metal" in ARGS
+    Pkg.add("Metal")
+    using Metal
+    const backend = MetalBackend()
+    include(joinpath(@__DIR__, "gputests.jl"))
+end
+

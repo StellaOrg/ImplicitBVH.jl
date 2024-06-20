@@ -7,13 +7,19 @@
 module ImplicitBVH
 
 # Functionality exported by this package by default
-export BVH, BVHTraversal, traverse, default_start_level
+export BVH, BVHTraversal, BVHOptions, traverse, default_start_level
 export ImplicitTree, memory_index, level_indices, isvirtual
 
 
 # Internal dependencies
 using LinearAlgebra
 using DocStringExtensions
+
+using KernelAbstractions
+using Atomix: @atomic
+using GPUArrays: AbstractGPUVector, @allowscalar
+
+import AcceleratedKernels as AK
 
 
 # Include code from other files

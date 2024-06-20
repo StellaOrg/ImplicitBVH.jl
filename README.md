@@ -5,7 +5,9 @@
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/dev)
 
 # ImplicitBVH.jl
-*High-Performance Parallel Bounding Volume Hierarchy for Collision Detection*
+*High-Performance Cross-Architecture Bounding Volume Hierarchy for Collision Detection*
+
+**New in v0.5.0: GPU acceleration via AcceleratedKernels.jl/KernelAbstractions.jl targeting all JuliaGPU backends, i.e. Nvidia CUDA, AMD ROCm, Intel oneAPI, Apple Metal.**
 
 It uses an implicit bounding volume hierarchy constructed from an iterable of some geometric
 primitives' (e.g. triangles in a mesh) bounding volumes forming the `ImplicitTree` leaves. The leaves
@@ -118,11 +120,39 @@ traversal = traverse(
     default_start_level(bvh1),
     default_start_level(bvh2),
     # previous_traversal_cache,
-    # num_threads=4,
+    # options=BVHOptions(),
 )
 ```
 
 Check out the `benchmark` folder for an example traversing an STL model.
+
+
+# GPU Bounding Volume Hierarchy Building and Traversal
+
+Simply use a GPU array for the bounding volumes; the interface remains the same, and all operations - Morton encoding, sorting, BVH building and traversal for contact finding - will run on the right backend:
+
+```julia
+# Works with CUDA.jl/CuArray, AMDGPU.jl/ROCArray, oneAPI.jl/oneArray, Metal.jl/MtlArray
+using AMDGPU
+
+using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
+
+# Generate some simple bounding spheres; save them in a GPU array
+bounding_spheres = ROCArray([
+    BSphere{Float32}([0., 0., 0.], 0.5),
+    BSphere{Float32}([0., 0., 1.], 0.6),
+    BSphere{Float32}([0., 0., 2.], 0.5),
+    BSphere{Float32}([0., 0., 3.], 0.4),
+    BSphere{Float32}([0., 0., 4.], 0.6),
+])
+
+# Build BVH
+bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
+
+# Traverse BVH for contact detection
+traversal = traverse(bvh)
+```
 
 
 # Implicit Bounding Volume Hierarchy
@@ -156,11 +186,6 @@ vision applications, this implementation has been optimised for maximum performa
 - Traversing the same 249,882 `BSphere{Float64}` for the triangles (aggregated into `BBox{Float64}` parents) takes 136.38 ms single-threaded and 43.16 ms with 4 threads, at 79% strong scaling.
 
 Only fundamental Julia types are used - e.g. `struct`, `Tuple`, `UInt`, `Float64` - which can be straightforwardly inlined, unrolled and fused by the compiler. These types are also straightforward to transpile to accelerators via [`KernelAbstractions.jl`](https://github.com/JuliaGPU/KernelAbstractions.jl) such as `CUDA`, `AMDGPU`, `oneAPI`, `Apple Metal`.
-
-
-# Roadmap
-
-- Use `KernelAbstractions.jl` kernels to build and traverse the BVH; I think we just need a performant KA `sort!` function, the rest is straightforward.
 
 
 # References

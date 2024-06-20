@@ -1,0 +1,9 @@
+[deps]
+AcceleratedKernels = "6a4ca0a5-0e36-4168-a932-d9be78d558f1"
+Atomix = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
+Cthulhu = "f68482b8-f384-11e8-15f7-abe071a5a75f"
+ImplicitBVH = "932a18dc-bb55-4cd5-bdd6-1368ec9cea29"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+Polyester = "f517fe37-dbe3-4b94-8317-1923a5111588"
+ThreadPinning = "811555cd-349b-4f26-b7bc-1f208b848042"
+oneAPI = "8f75cd03-7ff8-4ecb-9b8f-daf728133b1b"

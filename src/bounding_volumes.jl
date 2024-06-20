@@ -57,6 +57,9 @@ struct BSphere{T}
     r::T
 end
 
+Base.eltype(::BSphere{T}) where T = T
+Base.eltype(::Type{BSphere{T}}) where T = T
+
 
 # Convenience constructors, with and without type parameter
 BSphere{T}(x::AbstractVector, r) where T = BSphere(NTuple{3, T}(x), T(r))
@@ -247,6 +250,10 @@ struct BBox{T}
     lo::NTuple{3, T}
     up::NTuple{3, T}
 end
+
+Base.eltype(::BBox{T}) where T = T
+Base.eltype(::Type{BBox{T}}) where T = T
+
 
 
 # Convenience constructors, with and without type parameter

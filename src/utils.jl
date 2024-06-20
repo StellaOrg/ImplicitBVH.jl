@@ -1,6 +1,128 @@
 """
     $(TYPEDEF)
 
+Options for building and traversing bounding volume hierarchies, including parallel strategy
+settings.
+
+The CPU scheduler can be `:threads` (for base Julia threads) or `:polyester` (for Polyester.jl
+threads).
+
+If `compute_extrema=false` and `mins` / `maxs` are defined, they will not be computed from the
+distribution of bounding volumes; useful if you have a fixed simulation box, for example.
+
+# Methods
+    BVHOptions(;
+
+        # CPU threading
+        scheduler                       = :threads,
+        num_threads::Int                = Threads.nthreads(),
+        min_mortons_per_thread::Int     = 1000,
+        min_boundings_per_thread::Int   = 1000,
+        min_traversals_per_thread::Int  = 1000,
+
+        # GPU scheduling
+        block_size::Int                 = 256,
+
+        # Minima / maxima
+        compute_extrema::Bool           = true,
+        mins::NTuple{3, T}              = (NaN32, NaN32, NaN32),
+        maxs::NTuple{3, T}              = (NaN32, NaN32, NaN32),
+    ) where T
+
+# Fields
+    $(TYPEDFIELDS)
+
+"""
+struct BVHOptions{T}
+
+    # CPU threading
+    scheduler::Symbol
+    num_threads::Int
+    min_mortons_per_thread::Int
+    min_boundings_per_thread::Int
+    min_traversals_per_thread::Int
+
+    # GPU scheduling
+    block_size::Int
+
+    # Minima / maxima
+    compute_extrema::Bool
+    mins::NTuple{3, T}
+    maxs::NTuple{3, T}
+end
+
+
+function BVHOptions(;
+
+    # CPU threading
+    scheduler                       = :threads,
+    num_threads::Int                = Threads.nthreads(),
+    min_mortons_per_thread::Int     = 1000,
+    min_boundings_per_thread::Int   = 1000,
+    min_traversals_per_thread::Int  = 1000,
+
+    # GPU scheduling
+    block_size::Int                 = 256,
+
+    # Minima / maxima
+    compute_extrema::Bool           = true,
+    mins::NTuple{3, T}              = (NaN32, NaN32, NaN32),
+    maxs::NTuple{3, T}              = (NaN32, NaN32, NaN32),
+) where T
+
+    # Correctness checks
+    @assert num_threads > 0
+    @assert min_mortons_per_thread > 0
+    @assert min_boundings_per_thread > 0
+    @assert min_traversals_per_thread > 0
+    @assert block_size > 0
+
+    # If we want to avoid computing extrema, make sure `mins` and `maxs` were defined
+    if !compute_extrema
+        @assert all(isfinite, mins)
+        @assert all(isfinite, maxs)
+    end
+
+    BVHOptions(
+        scheduler,
+        num_threads,
+        min_mortons_per_thread,
+        min_boundings_per_thread,
+        min_traversals_per_thread,
+        block_size,
+        compute_extrema,
+        mins,
+        maxs,
+    )
+end
+
+
+# Forwarding the right keyword arguments to AcceleratedKernels.jl.
+function foreachindex(
+    f, itr, backend=nothing;
+
+    # CPU options
+    scheduler=:threads,
+    max_tasks=Threads.nthreads(),
+    min_elems=1,
+
+    # GPU options
+    block_size=256,
+)
+    _backend = isnothing(backend) ? get_backend(itr) : backend
+
+    if _backend isa GPU
+        AK.foreachindex(f, itr, _backend; block_size=block_size)
+    else
+        AK.foreachindex(f, itr, _backend; scheduler=scheduler,
+                        max_tasks=max_tasks, min_elems=min_elems)
+    end
+end
+
+
+"""
+    $(TYPEDEF)
+
 Partitioning `num_elems` elements / jobs over maximum `max_tasks` tasks with minimum `min_elems`
 elements per task.
 
@@ -91,15 +213,22 @@ Base.length(tp::TaskPartitioner) = tp.num_tasks
 const IntBits = Union{Int8, Int16, Int32, Int64, Int128,
                       UInt8, UInt16, UInt32, UInt64, UInt128}
 
-ilog2(x, ::typeof(RoundUp)) = ispow2(x) ? ilog2(x) : ilog2(x) + 1
-ilog2(x, ::typeof(RoundDown)) = ilog2(x)
-
 @generated function msbindex(::Type{T}) where {T <: Integer}
     sizeof(T) * 8 - 1
 end
 
+ilog2(x, ::typeof(RoundUp)) = ispow2(x) ? ilog2(x) : ilog2(x) + 1
+ilog2(x, ::typeof(RoundDown)) = ilog2(x)
+
 @inline function ilog2(n::T) where {T <: IntBits}
     @boundscheck n > zero(T) || throw(DomainError(n))
+    msbindex(T) - leading_zeros(n)
+end
+
+unsafe_ilog2(x, ::typeof(RoundUp)) = ispow2(x) ? unsafe_ilog2(x) : unsafe_ilog2(x) + 1
+unsafe_ilog2(x, ::typeof(RoundDown)) = unsafe_ilog2(x)
+
+@inline function unsafe_ilog2(n::T) where {T <: IntBits}
     msbindex(T) - leading_zeros(n)
 end
 
@@ -107,7 +236,7 @@ end
 
 
 # Specialised maths functions
-pow2(n::Integer) = 1 << n
+pow2(n::I) where I <: Integer = one(I) << n
 
 
 function dot3(x, y)
