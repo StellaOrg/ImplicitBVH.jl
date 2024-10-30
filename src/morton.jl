@@ -85,13 +85,13 @@ relative_precision(::Type{Float64}) = Float64(1e-14)
 Return Morton code for a single 3D position `centre` scaled uniformly between `mins` and `maxs`.
 Works transparently for SVector, Vector, etc. with eltype UInt16, UInt32 or UInt64.
 """
-@inline function morton_encode_single(centre, mins, maxs, ::Type{U}=UInt) where {U <: MortonUnsigned}
+@inline function morton_encode_single(centre, mins, maxs, ::Type{U}=UInt32) where {U <: MortonUnsigned}
     scaling = morton_scaling(U)
     m = zero(U)
 
     @inbounds for i in 1:3
         scaled = (centre[i] - mins[i]) / (maxs[i] - mins[i])    # Scaling number between (0, 1)
-        index = U(floor(scaled * scaling))                      # Scaling to (0, morton_scaling)
+        index = unsafe_trunc(U, scaled * scaling)               # Scaling to (0, morton_scaling)
         m += morton_split3(index) << (3 - i)                    # Shift into position - XYZXYZXYZ
     end
 
@@ -99,29 +99,8 @@ Works transparently for SVector, Vector, etc. with eltype UInt16, UInt32 or UInt
 end
 
 
-function morton_encode_range!(
-    mortons::AbstractVector{U},
-    bounding_volumes,
-    mins, maxs,
-    irange,
-) where {U <: MortonUnsigned}
-
-    @inbounds for i in irange[1]:irange[2]
-        bv_center = center(bounding_volumes[i])
-        mortons[i] = morton_encode_single(bv_center, mins, maxs, U)
-    end
-
-    nothing
-end
-
-
-"""
-    bounding_volumes_extrema(bounding_volumes)
-
-Compute exclusive lower and upper bounds in iterable of bounding volumes, e.g. Vector{BBox}.
-"""
-function bounding_volumes_extrema(bounding_volumes)
-
+function _compute_extrema(bounding_volumes::AbstractVector, options)
+    # Fallback CPU version; extremely simple operations, so left single threaded
     xmin, ymin, zmin = center(bounding_volumes[1])
     xmax, ymax, zmax = xmin, ymin, zmin
 
@@ -137,6 +116,64 @@ function bounding_volumes_extrema(bounding_volumes)
         yc > ymax && (ymax = yc)
         zc > zmax && (zmax = zc)
     end
+
+    (xmin, ymin, zmin), (xmax, ymax, zmax)
+end
+
+
+function _compute_extrema(bounding_volumes::AbstractGPUVector, options)
+    # GPU implementation
+
+    function min_centers(a, b)
+        # a and b are NTuple{3, Float}
+        (
+            a[1] < b[1] ? a[1] : b[1],
+            a[2] < b[2] ? a[2] : b[2],
+            a[3] < b[3] ? a[3] : b[3],
+        )
+    end
+
+    function max_centers(a, b)
+        # a and b are NTuple{3, Float}
+        (
+            a[1] > b[1] ? a[1] : b[1],
+            a[2] > b[2] ? a[2] : b[2],
+            a[3] > b[3] ? a[3] : b[3],
+        )
+    end
+
+    # Get numeric type of the inner bounding volume
+    T = eltype(eltype(bounding_volumes))
+
+    xyzmin = AK.mapreduce(
+        center,             # Take the centre of each bounding volume
+        min_centers,        # Reduce to the 3D minimum
+        bounding_volumes,
+        init=(floatmax(T), floatmax(T), floatmax(T)),
+        block_size=options.block_size,
+    )
+
+    xyzmax = AK.mapreduce(
+        center,
+        max_centers,
+        bounding_volumes,
+        init=(floatmin(T), floatmin(T), floatmin(T)),
+        block_size=options.block_size,
+    )
+
+    xyzmin, xyzmax
+end
+
+
+"""
+    bounding_volumes_extrema(bounding_volumes)
+
+Compute exclusive lower and upper bounds in iterable of bounding volumes, e.g. Vector{BBox}.
+"""
+function bounding_volumes_extrema(bounding_volumes::AbstractVector, options=BVHOptions())
+
+    # Compute exact extrema
+    (xmin, ymin, zmin), (xmax, ymax, zmax) = _compute_extrema(bounding_volumes, options)
 
     # Expand extrema by float precision to ensure morton codes are exclusively bounded by them
     T = typeof(xmin)
@@ -154,8 +191,19 @@ end
 
 
 """
-    morton_encode!(mortons::AbstractVector{U}, bounding_volumes) where {U <: MortonUnsigned}
-    morton_encode!(mortons::AbstractVector{U}, bounding_volumes, mins, maxs)
+    morton_encode!(
+        mortons::AbstractVector{U},
+        bounding_volumes,
+        options=BVHOptions(),
+    ) where {U <: MortonUnsigned}
+
+    morton_encode!(
+        mortons::AbstractVector{U},
+        bounding_volumes::AbstractVector,
+        mins,
+        maxs,
+        options=BVHOptions(),
+    ) where {U <: MortonUnsigned}
 
 Encode each bounding volume into vector of corresponding Morton codes such that they uniformly
 cover the maximum Morton range given an unsigned integer type `U <: ` [`MortonUnsigned`](@ref).
@@ -168,38 +216,28 @@ function morton_encode!(
     mortons::AbstractVector{U},
     bounding_volumes::AbstractVector,
     mins,
-    maxs;
-    num_threads=Threads.nthreads(),
+    maxs,
+    options=BVHOptions(),
 ) where {U <: MortonUnsigned}
 
     # Bounds checking
-    @assert firstindex(mortons) == firstindex(bounding_volumes) == 1
-    @assert length(mortons) == length(bounding_volumes)
-    @assert length(mins) == length(maxs) == 3
+    @argcheck firstindex(mortons) == firstindex(bounding_volumes) == 1
+    @argcheck length(mortons) == length(bounding_volumes)
+    @argcheck length(mins) == length(maxs) == 3
 
     # Trivial case
     length(bounding_volumes) == 0 && return nothing
 
-    # Encode bounding volumes' centres across multiple threads using contiguous ranges
-    tp = TaskPartitioner(length(bounding_volumes), num_threads, 1000)
-    if tp.num_tasks == 1
-        morton_encode_range!(
-            mortons, bounding_volumes,
-            mins, maxs,
-            (firstindex(bounding_volumes), lastindex(bounding_volumes)),
-        )
-    else
-        tasks = Vector{Task}(undef, tp.num_tasks)
-        @inbounds for i in 1:tp.num_tasks
-            tasks[i] = Threads.@spawn morton_encode_range!(
-                mortons, bounding_volumes,
-                mins, maxs,
-                tp[i],
-            )
-        end
-        @inbounds for i in 1:tp.num_tasks
-            wait(tasks[i])
-        end
+    # Parallelise on CPU / GPU
+    AK.foreachindex(
+        mortons,
+        block_size=options.block_size,
+        scheduler=options.scheduler,
+        max_tasks=options.num_threads,
+        min_elems=options.min_mortons_per_thread,
+    ) do i
+        @inbounds bv_center = center(bounding_volumes[i])
+        @inbounds mortons[i] = morton_encode_single(bv_center, mins, maxs, U)
     end
 
     nothing
@@ -208,31 +246,40 @@ end
 
 function morton_encode!(
     mortons::AbstractVector{U},
-    bounding_volumes;
-    num_threads=Threads.nthreads(),
+    bounding_volumes,
+    options=BVHOptions(),
 ) where {U <: MortonUnsigned}
 
     # Compute exclusive bounds [xmin, ymin, zmin], [xmax, ymax, zmax].
-    mins, maxs = bounding_volumes_extrema(bounding_volumes)
-    morton_encode!(mortons, bounding_volumes, mins, maxs, num_threads=num_threads)
+    if options.compute_extrema
+        mins, maxs = bounding_volumes_extrema(bounding_volumes, options)
+    else
+        mins = options.mins
+        maxs = options.maxs
+    end
+    morton_encode!(mortons, bounding_volumes, mins, maxs, options)
     nothing
 end
 
 
 """
-    morton_encode(bounding_volumes, ::Type{U}=UInt) where {U <: MortonUnsigned}
+    morton_encode(
+        bounding_volumes,
+        ::Type{U}=UInt,
+        options=BVHOptions(),
+    ) where {U <: MortonUnsigned}
 
 Encode the centers of some `bounding_volumes` as Morton codes of type `U <: `
 [`MortonUnsigned`](@ref). See [`morton_encode!`](@ref) for full details. 
 """
 function morton_encode(
     bounding_volumes,
-    ::Type{U}=UInt;
-    num_threads=Threads.nthreads(),
+    ::Type{U}=UInt32,
+    options=BVHOptions(),
 ) where {U <: MortonUnsigned}
 
     # Pre-allocate vector of morton codes
     mortons = similar(bounding_volumes, U)
-    morton_encode!(mortons, bounding_volumes, num_threads=num_threads)
+    morton_encode!(mortons, bounding_volumes, options)
     mortons
 end

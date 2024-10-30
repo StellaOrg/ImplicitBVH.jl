@@ -158,11 +158,17 @@ Check if given `implicit_index` corresponds to a virtual node.
         end
     end
 
+    unsafe_isvirtual(tree, implicit_index)
+end
+
+
+@inline function unsafe_isvirtual(tree::ImplicitTree, implicit_index::Integer)
     # Level at which the implicit index is
-    level = @inbounds ilog2(implicit_index, RoundDown) + 1
+    level = unsafe_ilog2(implicit_index, RoundDown) + 1
     level_first = pow2(level - 1)
     nreal = level_first - tree.virtual_leaves >> (tree.levels - level)
 
     # If index is beyond last real node, it's virtual
     implicit_index - level_first + 1 > nreal    
 end
+

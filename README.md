@@ -5,7 +5,9 @@
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/dev)
 
 # ImplicitBVH.jl
-*High-Performance Parallel Bounding Volume Hierarchy for Collision Detection*
+*High-Performance Cross-Architecture Bounding Volume Hierarchy for Collision Detection*
+
+**New in v0.5.0: GPU acceleration via [AcceleratedKernels.jl](https://github.com/anicusan/AcceleratedKernels.jl)/[KernelAbstractions.jl](https://github.com/JuliaGPU/KernelAbstractions.jl) targeting all JuliaGPU backends, i.e. Nvidia CUDA, AMD ROCm, Intel oneAPI, Apple Metal.**
 
 It uses an implicit bounding volume hierarchy constructed from an iterable of some geometric
 primitives' (e.g. triangles in a mesh) bounding volumes forming the `ImplicitTree` leaves. The leaves
@@ -118,11 +120,39 @@ traversal = traverse(
     default_start_level(bvh1),
     default_start_level(bvh2),
     # previous_traversal_cache,
-    # num_threads=4,
+    # options=BVHOptions(),
 )
 ```
 
 Check out the `benchmark` folder for an example traversing an STL model.
+
+
+# GPU Bounding Volume Hierarchy Building and Traversal
+
+Simply use a GPU array for the bounding volumes; the interface remains the same, and all operations - Morton encoding, sorting, BVH building and traversal for contact finding - will run on the right backend:
+
+```julia
+# Works with CUDA.jl/CuArray, AMDGPU.jl/ROCArray, oneAPI.jl/oneArray, Metal.jl/MtlArray
+using AMDGPU
+
+using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
+
+# Generate some simple bounding spheres; save them in a GPU array
+bounding_spheres = ROCArray([
+    BSphere{Float32}([0., 0., 0.], 0.5),
+    BSphere{Float32}([0., 0., 1.], 0.6),
+    BSphere{Float32}([0., 0., 2.], 0.5),
+    BSphere{Float32}([0., 0., 3.], 0.4),
+    BSphere{Float32}([0., 0., 4.], 0.6),
+])
+
+# Build BVH
+bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
+
+# Traverse BVH for contact detection
+traversal = traverse(bvh)
+```
 
 
 # Implicit Bounding Volume Hierarchy
@@ -149,7 +179,7 @@ nodes we need to skip to get to a given node index, following the fantastic idea
 # Performance
 
 As contact detection is one of the most computationally-intensive parts of physical simulation and computer
-vision applications, this implementation has been optimised for maximum performance and scalability:
+vision applications, ~~we spent a stupid amount of time optimising~~ this implementation has been optimised for maximum performance and scalability:
 
 - Computing bounding volumes is optimised for triangles, e.g. constructing 249,882 `BSphere{Float64}` on a single thread takes 4.47 ms on my Mac M1. The construction itself has zero allocations; all computation can be done in parallel in user code.
 - Building a complete bounding volume hierarchy from the 249,882 triangles of [`xyzrgb_dragon.obj`](https://github.com/alecjacobson/common-3d-test-models/blob/master/data/xyzrgb_dragon.obj) takes 11.83 ms single-threaded. The sorting step is the bottleneck, so multi-threading the Morton encoding and BVH up-building does not significantly improve the runtime; waiting on a multi-threaded sorter.
@@ -160,7 +190,11 @@ Only fundamental Julia types are used - e.g. `struct`, `Tuple`, `UInt`, `Float64
 
 # Roadmap
 
-- Use `KernelAbstractions.jl` kernels to build and traverse the BVH; I think we just need a performant KA `sort!` function, the rest is straightforward.
+- Raytracing
+- Atomics on Metal and oneAPI - waiting on Atomix.jl
+- Coherent types for indices on GPUs (e.g. when using Int32 in core kernels, only use 32-bit objects)
+- Avoiding / exposing memory allocations (temps, minmax reduce, morton order, etc.)
+- GPU CI
 
 
 # References

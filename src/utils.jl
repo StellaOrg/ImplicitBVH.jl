@@ -1,6 +1,120 @@
 """
     $(TYPEDEF)
 
+Options for building and traversing bounding volume hierarchies, including parallel strategy
+settings.
+
+An exemplar of an index (e.g. `Int32(0)`) is used to deduce the types of indices used in the BVH
+building (`ImplicitTree`(@ref), order) and traversal (`IndexPair`(@ref)).
+
+The CPU scheduler can be `:threads` (for base Julia threads) or `:polyester` (for Polyester.jl
+threads).
+
+If `compute_extrema=false` and `mins` / `maxs` are defined, they will not be computed from the
+distribution of bounding volumes; useful if you have a fixed simulation box, for example.
+
+# Methods
+    BVHOptions(;
+
+        # Example index from which to deduce type
+        index_exemplar::I               = Int32(0),
+
+        # CPU threading
+        scheduler::Symbol               = :threads,
+        num_threads::Int                = Threads.nthreads(),
+        min_mortons_per_thread::Int     = 1000,
+        min_boundings_per_thread::Int   = 1000,
+        min_traversals_per_thread::Int  = 1000,
+
+        # GPU scheduling
+        block_size::Int                 = 256,
+
+        # Minima / maxima
+        compute_extrema::Bool           = true,
+        mins::NTuple{3, T}              = (NaN32, NaN32, NaN32),
+        maxs::NTuple{3, T}              = (NaN32, NaN32, NaN32),
+    ) where {I <: Integer, T}
+
+# Fields
+    $(TYPEDFIELDS)
+
+"""
+struct BVHOptions{I <: Integer, T}
+
+    # Example index from which to deduce type
+    index_exemplar::I
+
+    # CPU threading
+    scheduler::Symbol
+    num_threads::Int
+    min_mortons_per_thread::Int
+    min_boundings_per_thread::Int
+    min_traversals_per_thread::Int
+
+    # GPU scheduling
+    block_size::Int
+
+    # Minima / maxima
+    compute_extrema::Bool
+    mins::NTuple{3, T}
+    maxs::NTuple{3, T}
+end
+
+
+function BVHOptions(;
+
+    # Example index from which to deduce type
+    index_exemplar::I               = Int32(0),
+
+    # CPU threading
+    scheduler::Symbol               = :threads,
+    num_threads::Int                = Threads.nthreads(),
+    min_mortons_per_thread::Int     = 1000,
+    min_boundings_per_thread::Int   = 1000,
+    min_traversals_per_thread::Int  = 1000,
+
+    # GPU scheduling
+    block_size::Int                 = 256,
+
+    # Minima / maxima
+    compute_extrema::Bool           = true,
+    mins::NTuple{3, T}              = (NaN32, NaN32, NaN32),
+    maxs::NTuple{3, T}              = (NaN32, NaN32, NaN32),
+) where {I <: Integer, T}
+
+    # Correctness checks
+    @argcheck num_threads > 0
+    @argcheck min_mortons_per_thread > 0
+    @argcheck min_boundings_per_thread > 0
+    @argcheck min_traversals_per_thread > 0
+    @argcheck block_size > 0
+
+    # If we want to avoid computing extrema, make sure `mins` and `maxs` were defined
+    if !compute_extrema
+        @argcheck all(isfinite, mins)
+        @argcheck all(isfinite, maxs)
+    end
+
+    BVHOptions(
+        index_exemplar,
+        scheduler,
+        num_threads,
+        min_mortons_per_thread,
+        min_boundings_per_thread,
+        min_traversals_per_thread,
+        block_size,
+        compute_extrema,
+        mins,
+        maxs,
+    )
+end
+
+
+
+
+"""
+    $(TYPEDEF)
+
 Partitioning `num_elems` elements / jobs over maximum `max_tasks` tasks with minimum `min_elems`
 elements per task.
 
@@ -91,15 +205,22 @@ Base.length(tp::TaskPartitioner) = tp.num_tasks
 const IntBits = Union{Int8, Int16, Int32, Int64, Int128,
                       UInt8, UInt16, UInt32, UInt64, UInt128}
 
-ilog2(x, ::typeof(RoundUp)) = ispow2(x) ? ilog2(x) : ilog2(x) + 1
-ilog2(x, ::typeof(RoundDown)) = ilog2(x)
-
 @generated function msbindex(::Type{T}) where {T <: Integer}
     sizeof(T) * 8 - 1
 end
 
+ilog2(x, ::typeof(RoundUp)) = ispow2(x) ? ilog2(x) : ilog2(x) + 1
+ilog2(x, ::typeof(RoundDown)) = ilog2(x)
+
 @inline function ilog2(n::T) where {T <: IntBits}
     @boundscheck n > zero(T) || throw(DomainError(n))
+    msbindex(T) - leading_zeros(n)
+end
+
+unsafe_ilog2(x, ::typeof(RoundUp)) = ispow2(x) ? unsafe_ilog2(x) : unsafe_ilog2(x) + 1
+unsafe_ilog2(x, ::typeof(RoundDown)) = unsafe_ilog2(x)
+
+@inline function unsafe_ilog2(n::T) where {T <: IntBits}
     msbindex(T) - leading_zeros(n)
 end
 
@@ -107,7 +228,7 @@ end
 
 
 # Specialised maths functions
-pow2(n::Integer) = 1 << n
+pow2(n::I) where I <: Integer = one(I) << n
 
 
 function dot3(x, y)

@@ -57,6 +57,9 @@ struct BSphere{T}
     r::T
 end
 
+Base.eltype(::BSphere{T}) where T = T
+Base.eltype(::Type{BSphere{T}}) where T = T
+
 
 # Convenience constructors, with and without type parameter
 BSphere{T}(x::AbstractVector, r) where T = BSphere(NTuple{3, T}(x), T(r))
@@ -165,7 +168,6 @@ center(b::BSphere) = b.x
 
 # Overloaded translate function
 function translate(b::BSphere{T}, dx) where T
-    @assert length(dx) == 3
     new_center = (b.x[1] + T(dx[1]),
                   b.x[2] + T(dx[2]),
                   b.x[3] + T(dx[3]))
@@ -248,6 +250,10 @@ struct BBox{T}
     up::NTuple{3, T}
 end
 
+Base.eltype(::BBox{T}) where T = T
+Base.eltype(::Type{BBox{T}}) where T = T
+
+
 
 # Convenience constructors, with and without type parameter
 function BBox{T}(lo::AbstractVector, up::AbstractVector) where T
@@ -309,7 +315,6 @@ center(b::BBox{T}) where T = (T(0.5) * (b.lo[1] + b.up[1]),
 
 # Overloaded translate function
 function translate(b::BBox{T}, dx) where T
-    @assert length(dx) == 3
     dx1, dx2, dx3 = T(dx[1]), T(dx[2]), T(dx[3])
     new_lo = (b.lo[1] + dx1,
               b.lo[2] + dx2,
