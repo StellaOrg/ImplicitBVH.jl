@@ -168,7 +168,6 @@ center(b::BSphere) = b.x
 
 # Overloaded translate function
 function translate(b::BSphere{T}, dx) where T
-    @assert length(dx) == 3
     new_center = (b.x[1] + T(dx[1]),
                   b.x[2] + T(dx[2]),
                   b.x[3] + T(dx[3]))
@@ -316,7 +315,6 @@ center(b::BBox{T}) where T = (T(0.5) * (b.lo[1] + b.up[1]),
 
 # Overloaded translate function
 function translate(b::BBox{T}, dx) where T
-    @assert length(dx) == 3
     dx1, dx2, dx3 = T(dx[1]), T(dx[2]), T(dx[3])
     new_lo = (b.lo[1] + dx1,
               b.lo[2] + dx2,

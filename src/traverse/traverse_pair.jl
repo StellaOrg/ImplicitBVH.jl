@@ -42,22 +42,25 @@ traversal = traverse(bvh1, bvh2, default_start_level(bvh1), default_start_level(
 ;
 
 # output
-traversal.contacts = [(1, 1), (2, 3)]
+traversal.contacts = Tuple{Int32, Int32}[(1, 1), (2, 3)]
 ```
 """
 function traverse(
-    bvh1::BVH{V1, V2, V3},
-    bvh2::BVH{V1, V2, V3},
+    bvh1::BVH,
+    bvh2::BVH,
     start_level1::Int=default_start_level(bvh1),
     start_level2::Int=default_start_level(bvh2),
     cache::Union{Nothing, BVHTraversal}=nothing;
     options=BVHOptions(),
-) where {V1, V2, V3}
+)
 
     @boundscheck begin
-        @assert bvh1.tree.levels >= start_level1 >= bvh1.built_level
-        @assert bvh2.tree.levels >= start_level2 >= bvh2.built_level
+        @argcheck bvh1.tree.levels >= start_level1 >= bvh1.built_level
+        @argcheck bvh2.tree.levels >= start_level2 >= bvh2.built_level
     end
+
+    # Get index type from exemplar
+    index_type = typeof(options.index_exemplar)
 
     # Explanation: say BVH1 has 10 levels, BVH2 has 8 levels; the last level has "leaves" (the
     # actual bounding volumes for contact detection), levels above have "nodes". Both BVHs are
@@ -84,7 +87,7 @@ function traverse(
     # For GPUs we need an additional global offset to coordinate writing results
     dst_offsets = if bvtt1 isa AbstractGPUVector
         backend = get_backend(bvtt1)
-        KernelAbstractions.zeros(backend, Int, bvh1.tree.levels * bvh2.tree.levels + 1)
+        KernelAbstractions.zeros(backend, index_type, bvh.tree.levels)
     else
         nothing
     end
@@ -190,11 +193,14 @@ function traverse(
     num_bvtt = traverse_leaves_pair!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, dst_offsets, options)
 
     # Return contact list and the other buffer as possible cache
-    BVHTraversal(start_level1, start_level2, num_checks, num_bvtt, bvtt2, bvtt1)
+    BVHTraversal(start_level1, start_level2, num_checks, Int(num_bvtt), bvtt2, bvtt1)
 end
 
 
-function initial_bvtt(bvh1, bvh2, start_level1, start_level2, cache, options)
+function initial_bvtt(bvh1::BVH, bvh2::BVH, start_level1, start_level2, cache, options)
+    # Get index type from exemplar
+    index_type = typeof(options.index_exemplar)
+
     # Generate all possible contact checks at the given start_level
     level_nodes1 = pow2(start_level1 - 1)
     level_nodes2 = pow2(start_level2 - 1)
@@ -215,9 +221,12 @@ function initial_bvtt(bvh1, bvh2, start_level1, start_level2, cache, options)
 
     # Reuse cache if given
     if isnothing(cache)
-        bvtt1 = similar(bvh1.nodes, IndexPair, initial_number)
-        bvtt2 = similar(bvh1.nodes, IndexPair, initial_number)
+        bvtt1 = similar(bvh1.nodes, IndexPair{index_type}, initial_number)
+        bvtt2 = similar(bvh1.nodes, IndexPair{index_type}, initial_number)
     else
+        @argcheck eltype(cache.cache1) === IndexPair{index_type}
+        @argcheck eltype(cache.cache2) === IndexPair{index_type}
+
         bvtt1 = cache.cache1
         bvtt2 = cache.cache2
 

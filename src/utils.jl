@@ -4,6 +4,9 @@
 Options for building and traversing bounding volume hierarchies, including parallel strategy
 settings.
 
+An exemplar of an index (e.g. `Int32(0)`) is used to deduce the types of indices used in the BVH
+building (`ImplicitTree`(@ref), order) and traversal (`IndexPair`(@ref)).
+
 The CPU scheduler can be `:threads` (for base Julia threads) or `:polyester` (for Polyester.jl
 threads).
 
@@ -13,8 +16,11 @@ distribution of bounding volumes; useful if you have a fixed simulation box, for
 # Methods
     BVHOptions(;
 
+        # Example index from which to deduce type
+        index_exemplar::I               = Int32(0),
+
         # CPU threading
-        scheduler                       = :threads,
+        scheduler::Symbol               = :threads,
         num_threads::Int                = Threads.nthreads(),
         min_mortons_per_thread::Int     = 1000,
         min_boundings_per_thread::Int   = 1000,
@@ -27,13 +33,16 @@ distribution of bounding volumes; useful if you have a fixed simulation box, for
         compute_extrema::Bool           = true,
         mins::NTuple{3, T}              = (NaN32, NaN32, NaN32),
         maxs::NTuple{3, T}              = (NaN32, NaN32, NaN32),
-    ) where T
+    ) where {I <: Integer, T}
 
 # Fields
     $(TYPEDFIELDS)
 
 """
-struct BVHOptions{T}
+struct BVHOptions{I <: Integer, T}
+
+    # Example index from which to deduce type
+    index_exemplar::I
 
     # CPU threading
     scheduler::Symbol
@@ -54,8 +63,11 @@ end
 
 function BVHOptions(;
 
+    # Example index from which to deduce type
+    index_exemplar::I               = Int32(0),
+
     # CPU threading
-    scheduler                       = :threads,
+    scheduler::Symbol               = :threads,
     num_threads::Int                = Threads.nthreads(),
     min_mortons_per_thread::Int     = 1000,
     min_boundings_per_thread::Int   = 1000,
@@ -68,22 +80,23 @@ function BVHOptions(;
     compute_extrema::Bool           = true,
     mins::NTuple{3, T}              = (NaN32, NaN32, NaN32),
     maxs::NTuple{3, T}              = (NaN32, NaN32, NaN32),
-) where T
+) where {I <: Integer, T}
 
     # Correctness checks
-    @assert num_threads > 0
-    @assert min_mortons_per_thread > 0
-    @assert min_boundings_per_thread > 0
-    @assert min_traversals_per_thread > 0
-    @assert block_size > 0
+    @argcheck num_threads > 0
+    @argcheck min_mortons_per_thread > 0
+    @argcheck min_boundings_per_thread > 0
+    @argcheck min_traversals_per_thread > 0
+    @argcheck block_size > 0
 
     # If we want to avoid computing extrema, make sure `mins` and `maxs` were defined
     if !compute_extrema
-        @assert all(isfinite, mins)
-        @assert all(isfinite, maxs)
+        @argcheck all(isfinite, mins)
+        @argcheck all(isfinite, maxs)
     end
 
     BVHOptions(
+        index_exemplar,
         scheduler,
         num_threads,
         min_mortons_per_thread,
@@ -97,27 +110,6 @@ function BVHOptions(;
 end
 
 
-# Forwarding the right keyword arguments to AcceleratedKernels.jl.
-function foreachindex(
-    f, itr, backend=nothing;
-
-    # CPU options
-    scheduler=:threads,
-    max_tasks=Threads.nthreads(),
-    min_elems=1,
-
-    # GPU options
-    block_size=256,
-)
-    _backend = isnothing(backend) ? get_backend(itr) : backend
-
-    if _backend isa GPU
-        AK.foreachindex(f, itr, _backend; block_size=block_size)
-    else
-        AK.foreachindex(f, itr, _backend; scheduler=scheduler,
-                        max_tasks=max_tasks, min_elems=min_elems)
-    end
-end
 
 
 """

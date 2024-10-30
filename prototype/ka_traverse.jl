@@ -5,7 +5,7 @@
 
 
 using Random
-using oneAPI: oneArray
+using Metal: MtlArray
 import AcceleratedKernels as AK
 
 using BenchmarkTools
@@ -141,12 +141,12 @@ Random.seed!(0)
 
 num_bvs = 100_000
 bvs = map(BSphere{Float32}, [100 * rand(3) .+ rand(3, 3) for _ in 1:num_bvs])
-bvs = oneArray(bvs)
+# bvs = MtlArray(bvs)
 
 options = BVHOptions(block_size=128, num_threads=8)
 bvh = BVH(bvs, BBox{Float32}, UInt32, 1, options=options)
-# @benchmark traverse(bvh)
-bvt = traverse(bvh)
+# @benchmark traverse(bvh, default_start_level(bvh), options=options)
+bvt = traverse(bvh, default_start_level(bvh), options=options)
 
 
 # check_isvirtual(bvh.tree)

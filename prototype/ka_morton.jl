@@ -5,7 +5,7 @@
 
 
 using Random
-using oneAPI: oneArray
+using Metal: MtlArray
 
 using BenchmarkTools
 
@@ -20,12 +20,12 @@ Random.seed!(0)
 
 num_bvs = 10_000_000
 bvs = map(BSphere{Float32}, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_bvs])
-bvs = oneArray(bvs)
+bvs = MtlArray(bvs)
 
 mortons = similar(bvs, UInt32)
 mins, maxs = ImplicitBVH.bounding_volumes_extrema(bvs)
 
-options = BVHOptions(block_size=128)
+options = BVHOptions(block_size=128, num_threads=8)
 @benchmark ImplicitBVH.morton_encode!(mortons, bvs, mins, maxs, options)
 
 

@@ -13,7 +13,7 @@ function traverse_nodes_range!(
         if implicit1 == implicit2
 
             # If the right child is virtual, only add left child self-check
-            if isvirtual(bvh.tree, 2 * implicit1 + 1)
+            if unsafe_isvirtual(bvh.tree, 2 * implicit1 + 1)
                 if self_checks
                     dst[num_dst + 1] = (implicit1 * 2, implicit1 * 2)
                     num_dst += 1
@@ -40,7 +40,7 @@ function traverse_nodes_range!(
             if iscontact(node1, node2)
                 # If the right node's right child is virtual, don't add that check. Guaranteed to
                 # always have node1 to the left of node2, hence its children will always be real
-                if isvirtual(bvh.tree, 2 * implicit2 + 1)
+                if unsafe_isvirtual(bvh.tree, 2 * implicit2 + 1)
                     dst[num_dst + 1] = (implicit1 * 2, implicit2 * 2)
                     dst[num_dst + 2] = (implicit1 * 2 + 1, implicit2 * 2)
                     num_dst += 2

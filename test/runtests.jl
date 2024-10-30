@@ -668,7 +668,7 @@ end
             bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
 
             # Brute force contact detection
-            brute_contacts = ImplicitBVH.IndexPair[]
+            brute_contacts = ImplicitBVH.IndexPair{Int}[]
             for i in 1:length(bvs)
                 for j in i + 1:length(bvs)
                     if ImplicitBVH.iscontact(bvs[i], bvs[j])
@@ -700,7 +700,7 @@ end
             bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
 
             # Brute force contact detection
-            brute_contacts = ImplicitBVH.IndexPair[]
+            brute_contacts = ImplicitBVH.IndexPair{Int}[]
             for i in 1:length(bvs)
                 for j in i + 1:length(bvs)
                     if ImplicitBVH.iscontact(bvs[i], bvs[j])
@@ -828,7 +828,7 @@ end
             bvs2 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities2])
 
             # Brute force contact detection
-            brute_contacts = ImplicitBVH.IndexPair[]
+            brute_contacts = ImplicitBVH.IndexPair{Int}[]
             for i in 1:length(bvs1)
                 for j in 1:length(bvs2)
                     if ImplicitBVH.iscontact(bvs1[i], bvs2[j])
@@ -863,7 +863,7 @@ end
             bvs2 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities2])
 
             # Brute force contact detection
-            brute_contacts = ImplicitBVH.IndexPair[]
+            brute_contacts = ImplicitBVH.IndexPair{Int}[]
             for i in 1:length(bvs1)
                 for j in 1:length(bvs2)
                     if ImplicitBVH.iscontact(bvs1[i], bvs2[j])

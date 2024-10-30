@@ -15,9 +15,10 @@ export ImplicitTree, memory_index, level_indices, isvirtual
 using LinearAlgebra
 using DocStringExtensions
 
+using ArgCheck
 using KernelAbstractions
 using Atomix: @atomic
-using GPUArrays: AbstractGPUVector, @allowscalar
+using GPUArraysCore: AbstractGPUVector, @allowscalar
 
 import AcceleratedKernels as AK
 
@@ -29,5 +30,6 @@ include("implicit_tree.jl")
 include("bounding_volumes.jl")
 include("build.jl")
 include("traverse/traverse.jl")
+include("utils_post.jl")
 
 end     # module ImplicitBVH

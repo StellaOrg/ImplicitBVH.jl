@@ -24,23 +24,26 @@ Tree Level          Nodes & Leaves               Build Up    Traverse Down
 ```
 
 # Methods
-    function BVH(
+    # Normal constructor which builds BVH
+    BVH(
         bounding_volumes::AbstractVector{L},
         node_type::Type{N}=L,
-        morton_type::Type{U}=UInt,
-        built_level::Integer=1;
-        num_threads=Threads.nthreads(),
+        morton_type::Type{U}=UInt32,
+        built_level=1;
+        options=BVHOptions(),
     ) where {L, N, U <: MortonUnsigned}
 
-    function BVH(
+    # Copy constructor reusing previous memory; previous
+    # bounding volumes are moved to new_positions.
+    BVH(
         prev::BVH,
         new_positions::AbstractMatrix,
         built_level=1;
-        num_threads=Threads.nthreads(),
+        options=BVHOptions(),
     )
 
 # Fields
-- `tree::`[`ImplicitTree`](@ref)`{Int}`
+- `tree::`[`ImplicitTree`](@ref)`{I <: Integer}`
 - `nodes::VN <: AbstractVector`
 - `leaves::VL <: AbstractVector`
 - `mortons::VM <: AbstractVector`
@@ -74,7 +77,7 @@ traversal = traverse(bvh)
 ;
 
 # output
-traversal.contacts = [(1, 2), (2, 3), (4, 5)]
+traversal.contacts = Tuple{Int32, Int32}[(1, 2), (2, 3), (4, 5)]
 ```
 
 Using `Float32` bounding spheres for leaves, `Float32` bounding boxes for nodes above, and `UInt32`
@@ -102,7 +105,7 @@ traversal = traverse(bvh)
 ;
 
 # output
-traversal.contacts = [(1, 2), (2, 3), (4, 5)]
+traversal.contacts = Tuple{Int32, Int32}[(1, 2), (2, 3), (4, 5)]
 ```
 
 Build BVH up to level 2 and start traversing down from level 3, reusing the previous traversal
@@ -120,9 +123,15 @@ new_positions = rand(3, 5)
 bvh_rebuilt = BVH(bvh, new_positions)
 ```
 """
-struct BVH{VN <: AbstractVector, VL <: AbstractVector, VM <: AbstractVector, VO <: AbstractVector}
-    built_level::Int
-    tree::ImplicitTree{Int}
+struct BVH{
+    I <: Integer,
+    VN <: AbstractVector,
+    VL <: AbstractVector,
+    VM <: AbstractVector,
+    VO <: AbstractVector,
+}
+    built_level::I
+    tree::ImplicitTree{I}
     nodes::VN
     leaves::VL
     mortons::VM
@@ -131,7 +140,7 @@ end
 
 
 # Custom pretty-printing
-function Base.show(io::IO, b::BVH{VN, VL, VM, VO}) where {VN, VL, VM, VO}
+function Base.show(io::IO, b::BVH{I, VN, VL, VM, VO}) where {I, VN, VL, VM, VO}
     print(
         io,
         """
@@ -151,13 +160,13 @@ end
 function BVH(
     bounding_volumes::AbstractVector{L},
     node_type::Type{N}=L,
-    morton_type::Type{U}=UInt,
+    morton_type::Type{U}=UInt32,
     built_level=1;
     options=BVHOptions(),
 ) where {L, N, U <: MortonUnsigned}
 
     # Ensure correctness
-    @assert firstindex(bounding_volumes) == 1 "BVH vector types used must be 1-indexed"
+    @argcheck firstindex(bounding_volumes) == 1 "BVH vector types used must be 1-indexed"
 
     # Ensure efficiency
     isconcretetype(N) || @warn "node_type given as unsized type (e.g. BBox instead of \
@@ -166,9 +175,12 @@ function BVH(
     isconcretetype(L) || @warn "bounding_volumes given as unsized type (e.g. BBox instead of \
                                 BBox{Float64}) leading to non-inline vector storage"
 
+    # Get index type from exemplar
+    I = get_index_type(options)
+
     # Pre-compute shape of the implicit tree
     numbv = length(bounding_volumes)
-    tree = ImplicitTree{Int}(numbv)
+    tree = ImplicitTree{I}(numbv)
 
     # Compute level up to which tree should be built
     built_ilevel = compute_build_level(tree, built_level)
@@ -178,22 +190,22 @@ function BVH(
     @inbounds morton_encode!(mortons, bounding_volumes, options)
 
     # Compute indices that sort codes along the Z-curve - closer objects have closer Morton codes
-    order = similar(mortons, Int)
+    order = similar(mortons, I)
     if mortons isa AbstractGPUVector
-        AK.merge_sortperm_lowmem!(order, mortons, block_size=options.block_size)
+        AK.sortperm!(order, mortons, block_size=options.block_size)
     else
         sortperm!(order, mortons)
     end
 
     # Pre-allocate vector of bounding volumes for the real nodes above the bottom level
-    bvh_nodes = similar(bounding_volumes, N, tree.real_nodes - tree.real_leaves)
+    bvh_nodes = similar(bounding_volumes, N, Int(tree.real_nodes - tree.real_leaves))
 
     # Aggregate bounding volumes up to built_ilevel
     if tree.real_nodes >= 2
         aggregate_oibvh!(bvh_nodes, bounding_volumes, tree, order, built_ilevel, options)
     end
 
-    BVH(built_ilevel, tree, bvh_nodes, bounding_volumes, mortons, order)
+    BVH(I(built_ilevel), tree, bvh_nodes, bounding_volumes, mortons, order)
 end
 
 
@@ -206,10 +218,13 @@ function BVH(
 )
 
     # Ensure correctness
-    @assert size(new_positions, 1) == 3 "new_positions need 3D coordinates on first axis"
-    @assert size(new_positions, 2) == length(prev.leaves) "Different number of new_positions"
-    @assert firstindex(new_positions, 1) == 1 "BVH vector types must be 1-indexed"
-    @assert firstindex(new_positions, 2) == 1 "BVH vector types must be 1-indexed"
+    @argcheck size(new_positions, 1) == 3 "new_positions need 3D coordinates on first axis"
+    @argcheck size(new_positions, 2) == length(prev.leaves) "Different number of new_positions"
+    @argcheck firstindex(new_positions, 1) == 1 "BVH vector types must be 1-indexed"
+    @argcheck firstindex(new_positions, 2) == 1 "BVH vector types must be 1-indexed"
+
+    # Get index type from exemplar
+    index_type = get_index_type(options)
 
     # Extract previous BVH fields
     tree = prev.tree
@@ -219,7 +234,7 @@ function BVH(
     order = prev.order
 
     # Compute level up to which tree should be built
-    built_ilevel = compute_build_level(tree, built_level)
+    built_ilevel = index_type(compute_build_level(tree, built_level))
 
     # Move the centres of previous bounding volumes to the coordinates of new_positions; ensure we
     # use the same type as in prev
@@ -240,7 +255,7 @@ function BVH(
         end
     end
 
-    foreachindex(
+    AK.foreachindex(
         bounding_volumes,
         block_size=options.block_size,
         scheduler=options.scheduler,
@@ -272,12 +287,14 @@ end
 # Compute level up to which tree should be built
 function compute_build_level(tree, built_level)
 
+    index_type = get_index_type(tree)
+
     if built_level isa Integer
-        @assert 1 <= built_level <= tree.levels
-        built_ilevel = Int(built_level)
+        @argcheck 1 <= built_level <= tree.levels
+        built_ilevel = index_type(built_level)
     elseif built_level isa AbstractFloat
-        @assert 0 <= built_level <= 1
-        built_ilevel = round(Int, tree.levels + (1 - tree.levels) * built_level)
+        @argcheck 0 <= built_level <= 1
+        built_ilevel = round(index_type, tree.levels + (1 - tree.levels) * built_level)
     else
         throw(TypeError(:BVH, "built_level (the level to build BVH up to)",
                         Union{Integer, AbstractFloat}, typeof(built_level)))
@@ -310,8 +327,11 @@ end
     num_nodes_next,
     i,
 )
-    lchild_implicit = 2i - 1
-    rchild_implicit = 2i
+    # Index type
+    I = typeof(i)
+
+    lchild_implicit = I(2) * i - I(1)
+    rchild_implicit = I(2) * i
 
     rchild_virtual = rchild_implicit > num_nodes_next
 
@@ -326,16 +346,16 @@ end
     if eltype(bvh_nodes) === eltype(bvh_leaves)
         # If right child is virtual, set the parent BV to the left child one; otherwise merge
         if rchild_virtual
-            bvh_nodes[start_pos - 1 + i] = bvh_leaves[lchild_index]
+            bvh_nodes[start_pos - I(1) + i] = bvh_leaves[lchild_index]
         else
-            bvh_nodes[start_pos - 1 + i] = bvh_leaves[lchild_index] + bvh_leaves[rchild_index]
+            bvh_nodes[start_pos - I(1) + i] = bvh_leaves[lchild_index] + bvh_leaves[rchild_index]
         end
     else
         if rchild_virtual
-            bvh_nodes[start_pos - 1 + i] = eltype(bvh_nodes)(bvh_leaves[lchild_index])
+            bvh_nodes[start_pos - I(1) + i] = eltype(bvh_nodes)(bvh_leaves[lchild_index])
         else
-            bvh_nodes[start_pos - 1 + i] = eltype(bvh_nodes)(bvh_leaves[lchild_index],
-                                                             bvh_leaves[rchild_index])
+            bvh_nodes[start_pos - I(1) + i] = eltype(bvh_nodes)(bvh_leaves[lchild_index],
+                                                                bvh_leaves[rchild_index])
         end
     end
 
@@ -344,19 +364,24 @@ end
 
 
 @inline function aggregate_last_level!(bvh_nodes, bvh_leaves, tree, order, options)
+
+    # Make sure types in the core kernel (which will be executed on CPU and GPU) are coherent;
+    # important, as GPUs are 32-bit machines
+    I = get_index_type(options)
+
     # Memory index of first node on this level (i.e. first above leaf-level)
     level = tree.levels - 1
-    start_pos = memory_index(tree, pow2(level - 1))
+    start_pos::I = memory_index(tree, pow2(level - 1))
 
     # Number of real nodes on this level
-    num_nodes = pow2(level - 1) - tree.virtual_leaves >> (tree.levels - level)
+    num_nodes::I = pow2(level - I(1)) - tree.virtual_leaves >> (tree.levels - level)
 
     # Merge all pairs of children below this level
-    num_nodes_next = pow2(level) - tree.virtual_leaves >> (tree.levels - (level + 1))
+    num_nodes_next::I = pow2(level) - tree.virtual_leaves >> (tree.levels - (level + I(1)))
 
     # Multithreaded CPU / GPU implementation
-    foreachindex(
-        1:num_nodes, get_backend(bvh_nodes),
+    AK.foreachindex(
+        I(1):num_nodes, get_backend(bvh_nodes),
         block_size=options.block_size,
         scheduler=options.scheduler,
         max_tasks=options.num_threads,
@@ -379,15 +404,18 @@ end
     num_nodes_next,
     i,
 )
-    lchild_index = start_pos_next + 2i - 2
-    rchild_index = start_pos_next + 2i - 1
+    # Index type
+    I = typeof(i)
 
-    if rchild_index > start_pos_next + num_nodes_next - 1
+    lchild_index = start_pos_next + I(2) * i - I(2)
+    rchild_index = start_pos_next + I(2) * i - I(1)
+
+    if rchild_index > start_pos_next + num_nodes_next - I(1)
         # If right child is virtual, set the parent BV to the child one
-        bvh_nodes[start_pos - 1 + i] = bvh_nodes[lchild_index]
+        bvh_nodes[start_pos - I(1) + i] = bvh_nodes[lchild_index]
     else
         # Merge children bounding volumes
-        bvh_nodes[start_pos - 1 + i] = bvh_nodes[lchild_index] + bvh_nodes[rchild_index]
+        bvh_nodes[start_pos - I(1) + i] = bvh_nodes[lchild_index] + bvh_nodes[rchild_index]
     end
 
     nothing
@@ -395,19 +423,24 @@ end
 
 
 @inline function aggregate_level!(bvh_nodes, level, tree, options)
+
+    # Make sure types in the core kernel (which will be executed on CPU and GPU) are coherent;
+    # important, as GPUs are 32-bit machines
+    I = get_index_type(options)
+
     # Memory index of first node on this level
-    start_pos = memory_index(tree, pow2(level - 1))
+    start_pos::I = memory_index(tree, pow2(level - 1))
 
     # Number of real nodes on this level
-    num_nodes = pow2(level - 1) - tree.virtual_leaves >> (tree.levels - level)
+    num_nodes::I = pow2(level - 1) - tree.virtual_leaves >> (tree.levels - level)
 
     # Merge all pairs of children below this level
-    start_pos_next = memory_index(tree, pow2(level))
-    num_nodes_next = pow2(level) - tree.virtual_leaves >> (tree.levels - (level + 1))
+    start_pos_next::I = memory_index(tree, pow2(level))
+    num_nodes_next::I = pow2(level) - tree.virtual_leaves >> (tree.levels - (level + 1))
 
     # Multithreaded CPU / GPU implementation
-    foreachindex(
-        1:num_nodes, get_backend(bvh_nodes),
+    AK.foreachindex(
+        I(1):num_nodes, get_backend(bvh_nodes),
         block_size=options.block_size,
         scheduler=options.scheduler,
         max_tasks=options.num_threads,

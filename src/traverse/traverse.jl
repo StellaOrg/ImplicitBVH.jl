@@ -3,7 +3,7 @@
 
 Alias for a tuple of two indices representing e.g. a contacting pair.
 """
-const IndexPair = Tuple{Int, Int}
+const IndexPair{I} = Tuple{I, I}
 
 
 """
@@ -83,12 +83,12 @@ Base.propertynames(::BVHTraversal) = (:start_level1, :start_level2, :num_checks,
 
 Compute the default start level when traversing a single BVH tree.
 """
-function default_start_level(bvh::BVH)
+function default_start_level(bvh::BVH)::Int
     maximum2(bvh.tree.levels ÷ 2, bvh.built_level)
 end
 
 
-function default_start_level(num_leaves::Integer)
+function default_start_level(num_leaves::Integer)::Int
     # Compute the default start level from the number of leaves (geometries) only
     @boundscheck if num_leaves < 1
         throw(DomainError(num_leaves, "must have at least one geometry!"))

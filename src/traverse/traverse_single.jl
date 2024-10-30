@@ -37,23 +37,28 @@ traversal = traverse(bvh, 2, traversal)
 ;
 
 # output
-traversal.contacts = [(1, 2), (2, 3), (4, 5)]
+traversal.contacts = Tuple{Int32, Int32}[(1, 2), (2, 3), (4, 5)]
 ```
 """
 function traverse(
     bvh::BVH,
-    start_level::Int,
+    start_level::Int=default_start_level(bvh),
     cache::Union{Nothing, BVHTraversal}=nothing;
     options=BVHOptions(),
 )
     # Correctness checks
-    @assert bvh.tree.levels >= start_level >= bvh.built_level
+    @boundscheck begin
+        @argcheck bvh.tree.levels >= start_level >= bvh.built_level
+    end
+
+    # Get index type from exemplar
+    I = get_index_type(options)
 
     # No contacts / traversal for a single node
     if bvh.tree.real_nodes <= 1
         return BVHTraversal(start_level, 0, 0,
-                            similar(bvh.nodes, IndexPair, 0),
-                            similar(bvh.nodes, IndexPair, 0))
+                            similar(bvh.nodes, IndexPair{I}, 0),
+                            similar(bvh.nodes, IndexPair{I}, 0))
     end
 
     # Allocate and add all possible BVTT contact pairs to start with
@@ -63,7 +68,7 @@ function traverse(
     # For GPUs we need an additional global offset to coordinate writing results
     dst_offsets = if bvtt1 isa AbstractGPUVector
         backend = get_backend(bvtt1)
-        KernelAbstractions.zeros(backend, Int, bvh.tree.levels)
+        KernelAbstractions.zeros(backend, I, Int(bvh.tree.levels))
     else
         nothing
     end
@@ -95,13 +100,11 @@ function traverse(
 end
 
 
-# Needed for compiler disambiguation; user interface is the same as for a default argument
-function traverse(bvh::BVH)
-    traverse(bvh, default_start_level(bvh), nothing)
-end
+function initial_bvtt(bvh::BVH, start_level, cache, options)
 
+    # Index type
+    I = get_index_type(options)
 
-function initial_bvtt(bvh, start_level, cache, options)
     # Generate all possible contact checks at the given start_level
     level_nodes = pow2(start_level - 1)
     level_checks = (level_nodes - 1) * level_nodes ÷ 2 + level_nodes
@@ -111,9 +114,12 @@ function initial_bvtt(bvh, start_level, cache, options)
 
     # Reuse cache if given
     if isnothing(cache)
-        bvtt1 = similar(bvh.nodes, IndexPair, initial_number)
-        bvtt2 = similar(bvh.nodes, IndexPair, initial_number)
+        bvtt1 = similar(bvh.nodes, IndexPair{I}, initial_number)
+        bvtt2 = similar(bvh.nodes, IndexPair{I}, initial_number)
     else
+        @argcheck eltype(cache.cache1) === IndexPair{I}
+        @argcheck eltype(cache.cache2) === IndexPair{I}
+
         bvtt1 = cache.cache1
         bvtt2 = cache.cache2
 
@@ -151,18 +157,17 @@ function fill_initial_bvtt_single!(bvtt1, num_levels, start_level, level_nodes, 
         n = num_real
         n_lin = n * (n - 1) ÷ 2
 
-        # TODO: add @inbounds after checking with CUDA
         if start_level != num_levels
             # First add n_lin node-node pair checks, then another n self-checks
             AK.foreachindex(1:n_lin + n, backend, block_size=options.block_size) do i_lin
                 if i_lin > n_lin
                     i = i_lin - n_lin - 1 + level_nodes
-                    bvtt1[i_lin] = (i, i)
+                    @inbounds bvtt1[i_lin] = (i, i)
                 else
                     i, j = tri_ij(n, i_lin - 1)
                     i += level_nodes
                     j += level_nodes
-                    bvtt1[i_lin] = (i, j)
+                    @inbounds bvtt1[i_lin] = (i, j)
                 end
             end
             num_bvtt = n_lin + n
@@ -175,7 +180,7 @@ function fill_initial_bvtt_single!(bvtt1, num_levels, start_level, level_nodes, 
                 i += level_nodes
                 j += level_nodes
 
-                bvtt1[i_lin] = (i, j)
+                @inbounds bvtt1[i_lin] = (i, j)
             end
             num_bvtt = n_lin
             return num_bvtt

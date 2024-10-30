@@ -85,7 +85,7 @@ relative_precision(::Type{Float64}) = Float64(1e-14)
 Return Morton code for a single 3D position `centre` scaled uniformly between `mins` and `maxs`.
 Works transparently for SVector, Vector, etc. with eltype UInt16, UInt32 or UInt64.
 """
-@inline function morton_encode_single(centre, mins, maxs, ::Type{U}=UInt) where {U <: MortonUnsigned}
+@inline function morton_encode_single(centre, mins, maxs, ::Type{U}=UInt32) where {U <: MortonUnsigned}
     scaling = morton_scaling(U)
     m = zero(U)
 
@@ -221,15 +221,15 @@ function morton_encode!(
 ) where {U <: MortonUnsigned}
 
     # Bounds checking
-    @assert firstindex(mortons) == firstindex(bounding_volumes) == 1
-    @assert length(mortons) == length(bounding_volumes)
-    @assert length(mins) == length(maxs) == 3
+    @argcheck firstindex(mortons) == firstindex(bounding_volumes) == 1
+    @argcheck length(mortons) == length(bounding_volumes)
+    @argcheck length(mins) == length(maxs) == 3
 
     # Trivial case
     length(bounding_volumes) == 0 && return nothing
 
     # Parallelise on CPU / GPU
-    foreachindex(
+    AK.foreachindex(
         mortons,
         block_size=options.block_size,
         scheduler=options.scheduler,
@@ -274,7 +274,7 @@ Encode the centers of some `bounding_volumes` as Morton codes of type `U <: `
 """
 function morton_encode(
     bounding_volumes,
-    ::Type{U}=UInt,
+    ::Type{U}=UInt32,
     options=BVHOptions(),
 ) where {U <: MortonUnsigned}
 
