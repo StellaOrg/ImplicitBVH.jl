@@ -240,6 +240,8 @@ end
 
 @testset "ray-box isintersection" begin
 
+    using ImplicitBVH: isintersection
+
     # Below box and ray going through corner
     box = BBox((0., 0., 0.), (1., 1., 1.))
     point = [-1., -1., -1.]
