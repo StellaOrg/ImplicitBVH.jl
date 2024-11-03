@@ -113,6 +113,19 @@ end
 
 
 
+# Get pair of children indices of nodes in a perfect binary tree
+_leftleft(implicit1::I, implicit2::I) where I = (implicit1 * I(2), implicit2 * I(2))
+_leftright(implicit1::I, implicit2::I) where I = (implicit1 * I(2), implicit2 * I(2) + I(1))
+_rightleft(implicit1::I, implicit2::I) where I = (implicit1 * I(2) + I(1), implicit2 * I(2))
+_rightright(implicit1::I, implicit2::I) where I = (implicit1 * I(2) + I(1), implicit2 * I(2) + I(1))
+
+_leftnoop(implicit1::I, implicit2::I) where I = (implicit1 * I(2), implicit2)
+_rightnoop(implicit1::I, implicit2::I) where I = (implicit1 * I(2) + I(1), implicit2)
+_noopleft(implicit1::I, implicit2::I) where I = (implicit1, implicit2 * I(2))
+_noopright(implicit1::I, implicit2::I) where I = (implicit1, implicit2 * I(2) + I(1))
+
+
+
 
 # Fast ilog2 adapted from https://github.com/jlapeyre/ILog2.jl - thank you!
 # Included here directly to minimise dependencies and possible errors surface area

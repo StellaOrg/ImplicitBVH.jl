@@ -1,5 +1,11 @@
-function traverse_nodes_pair!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, level2, options)
+function traverse_nodes_pair!(
+    bvh1, bvh2, src, dst, num_src,
+    cpu_extra::Tuple{Vector, Vector},
+    level1, level2,
+    options,
+)
     # Traverse nodes when level is above leaves for both BVH1 and BVH2
+    tasks, num_written = cpu_extra
 
     # Compute number of virtual elements before this level to skip when computing the memory index
     virtual_nodes_level1 = bvh1.tree.virtual_leaves >> (bvh1.tree.levels - (level1 - 1))
@@ -22,8 +28,6 @@ function traverse_nodes_pair!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, 
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 4 dst elements per src element
-        tasks = Vector{Task}(undef, tp.num_tasks)
-        num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
             irange = tp[i]
             istart = irange.start
@@ -83,28 +87,28 @@ function traverse_nodes_pair_range!(
 
                 # BVH2 node's right child is virtual too
                 if isvirtual(bvh2.tree, 2 * implicit2 + 1)
-                    dst[num_dst + 1] = (implicit1 * 2, implicit2 * 2)
+                    dst[num_dst + 1] = _leftleft(implicit1, implicit2)
                     num_dst += 1
 
                 # Only BVH1 node's right child is virtual
                 else
-                    dst[num_dst + 1] = (implicit1 * 2, implicit2 * 2)
-                    dst[num_dst + 2] = (implicit1 * 2, implicit2 * 2 + 1)
+                    dst[num_dst + 1] = _leftleft(implicit1, implicit2)
+                    dst[num_dst + 2] = _leftright(implicit1, implicit2)
                     num_dst += 2
                 end
 
             # Only BVH2 node's right child is virtual
             elseif isvirtual(bvh2.tree, 2 * implicit2 + 1)
-                dst[num_dst + 1] = (implicit1 * 2, implicit2 * 2)
-                dst[num_dst + 2] = (implicit1 * 2 + 1, implicit2 * 2)
+                dst[num_dst + 1] = _leftleft(implicit1, implicit2)
+                dst[num_dst + 2] = _rightleft(implicit1, implicit2)
                 num_dst += 2
 
             # All children are real
             else
-                dst[num_dst + 1] = (implicit1 * 2, implicit2 * 2)
-                dst[num_dst + 2] = (implicit1 * 2, implicit2 * 2 + 1)
-                dst[num_dst + 3] = (implicit1 * 2 + 1, implicit2 * 2)
-                dst[num_dst + 4] = (implicit1 * 2 + 1, implicit2 * 2 + 1)
+                dst[num_dst + 1] = _leftleft(implicit1, implicit2)
+                dst[num_dst + 2] = _leftright(implicit1, implicit2)
+                dst[num_dst + 3] = _rightleft(implicit1, implicit2)
+                dst[num_dst + 4] = _rightright(implicit1, implicit2)
                 num_dst += 4
             end
         end
@@ -120,8 +124,14 @@ function traverse_nodes_pair_range!(
 end
 
 
-function traverse_nodes_left!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, level2, options)
+function traverse_nodes_left!(
+    bvh1, bvh2, src, dst, num_src,
+    cpu_extra::Tuple{Vector, Vector},
+    level1, level2,
+    options,
+)
     # Traverse nodes when BVH2 is already one above leaf-level - i.e. only BVH1 is sprouted further
+    tasks, num_written = cpu_extra
 
     # Compute number of virtual elements before this level to skip when computing the memory index
     virtual_nodes_level1 = bvh1.tree.virtual_leaves >> (bvh1.tree.levels - (level1 - 1))
@@ -144,8 +154,6 @@ function traverse_nodes_left!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, 
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 2 dst elements per src element
-        tasks = Vector{Task}(undef, tp.num_tasks)
-        num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
             irange = tp[i]
             istart = irange.start
@@ -203,11 +211,11 @@ function traverse_nodes_left_range!(
 
             # BVH1 node's right child is virtual
             if isvirtual(bvh1.tree, 2 * implicit1 + 1)
-                dst[num_dst + 1] = (implicit1 * 2, implicit2)
+                dst[num_dst + 1] = _leftnoop(implicit1, implicit2)
                 num_dst += 1
             else
-                dst[num_dst + 1] = (implicit1 * 2, implicit2)
-                dst[num_dst + 2] = (implicit1 * 2 + 1, implicit2)
+                dst[num_dst + 1] = _leftnoop(implicit1, implicit2)
+                dst[num_dst + 2] = _rightnoop(implicit1, implicit2)
                 num_dst += 2
             end
         end
@@ -223,8 +231,14 @@ function traverse_nodes_left_range!(
 end
 
 
-function traverse_nodes_right!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, level2, options)
+function traverse_nodes_right!(
+    bvh1, bvh2, src, dst, num_src,
+    cpu_extra::Tuple{Vector, Vector},
+    level1, level2,
+    options,
+)
     # Traverse nodes when BVH2 is already one above leaf-level - i.e. only BVH1 is sprouted further
+    tasks, num_written = cpu_extra
 
     # Compute number of virtual elements before this level to skip when computing the memory index
     virtual_nodes_level1 = bvh1.tree.virtual_leaves >> (bvh1.tree.levels - (level1 - 1))
@@ -247,8 +261,6 @@ function traverse_nodes_right!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1,
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 2 dst elements per src element
-        tasks = Vector{Task}(undef, tp.num_tasks)
-        num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
             irange = tp[i]
             istart = irange.start
@@ -284,7 +296,7 @@ end
 
 
 function traverse_nodes_right_range!(
-    bvh1, bvh2, src, dst, num_written, num_skips1, num_skips2, irange,
+    bvh1, bvh2, src, dst, num_written,num_skips1, num_skips2, irange,
 )
     # Check src[irange[1]:irange[2]] and write to dst[1:num_dst]; dst should be given as a view
     num_dst = 0
@@ -306,11 +318,11 @@ function traverse_nodes_right_range!(
 
             # BVH2 node's right child is virtual
             if isvirtual(bvh2.tree, 2 * implicit2 + 1)
-                dst[num_dst + 1] = (implicit1, implicit2 * 2)
+                dst[num_dst + 1] = _noopleft(implicit1, implicit2)
                 num_dst += 1
             else
-                dst[num_dst + 1] = (implicit1, implicit2 * 2)
-                dst[num_dst + 2] = (implicit1, implicit2 * 2 + 1)
+                dst[num_dst + 1] = _noopleft(implicit1, implicit2)
+                dst[num_dst + 2] = _noopright(implicit1, implicit2)
                 num_dst += 2
             end
         end
@@ -326,8 +338,14 @@ function traverse_nodes_right_range!(
 end
 
 
-function traverse_nodes_leaves_left!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, level2, options)
+function traverse_nodes_leaves_left!(
+    bvh1, bvh2, src, dst, num_src,
+    cpu_extra::Tuple{Vector, Vector},
+    level1, level2,
+    options,
+)
     # Special case: BVH2 is at leaf level; only BVH1 is sprouted further with node-leaf checks
+    tasks, num_written = cpu_extra
 
     # Compute number of virtual elements before this level to skip when computing the memory index
     virtual_nodes_level1 = bvh1.tree.virtual_leaves >> (bvh1.tree.levels - (level1 - 1))
@@ -346,8 +364,6 @@ function traverse_nodes_leaves_left!(bvh1, bvh2, src, dst, num_src, ::Nothing, l
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 2 dst elements per src element
-        tasks = Vector{Task}(undef, tp.num_tasks)
-        num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
             irange = tp[i]
             istart = irange.start
@@ -409,11 +425,11 @@ function traverse_nodes_leaves_left_range!(
 
             # BVH1 node's right child is virtual
             if isvirtual(bvh1.tree, 2 * implicit1 + 1)
-                dst[num_dst + 1] = (implicit1 * 2, implicit2)
+                dst[num_dst + 1] = _leftnoop(implicit1, implicit2)
                 num_dst += 1
             else
-                dst[num_dst + 1] = (implicit1 * 2, implicit2)
-                dst[num_dst + 2] = (implicit1 * 2 + 1, implicit2)
+                dst[num_dst + 1] = _leftnoop(implicit1, implicit2)
+                dst[num_dst + 2] = _rightnoop(implicit1, implicit2)
                 num_dst += 2
             end
         end
@@ -429,8 +445,14 @@ function traverse_nodes_leaves_left_range!(
 end
 
 
-function traverse_nodes_leaves_right!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, level2, options)
+function traverse_nodes_leaves_right!(
+    bvh1, bvh2, src, dst, num_src,
+    cpu_extra::Tuple{Vector, Vector},
+    level1, level2,
+    options,
+)
     # Special case: BVH1 is at leaf level; only BVH2 is sprouted further with node-leaf checks
+    tasks, num_written = cpu_extra
 
     # Compute number of virtual elements before this level to skip when computing the memory index
     virtual_nodes_level2 = bvh2.tree.virtual_leaves >> (bvh2.tree.levels - (level2 - 1))
@@ -449,8 +471,6 @@ function traverse_nodes_leaves_right!(bvh1, bvh2, src, dst, num_src, ::Nothing, 
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 2 dst elements per src element
-        tasks = Vector{Task}(undef, tp.num_tasks)
-        num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
             irange = tp[i]
             istart = irange.start
@@ -512,11 +532,11 @@ function traverse_nodes_leaves_right_range!(
 
             # BVH2 node's right child is virtual
             if isvirtual(bvh2.tree, 2 * implicit2 + 1)
-                dst[num_dst + 1] = (implicit1, implicit2 * 2)
+                dst[num_dst + 1] = _noopleft(implicit1, implicit2)
                 num_dst += 1
             else
-                dst[num_dst + 1] = (implicit1, implicit2 * 2)
-                dst[num_dst + 2] = (implicit1, implicit2 * 2 + 1)
+                dst[num_dst + 1] = _noopleft(implicit1, implicit2)
+                dst[num_dst + 2] = _noopright(implicit1, implicit2)
                 num_dst += 2
             end
         end
@@ -532,8 +552,13 @@ function traverse_nodes_leaves_right_range!(
 end
 
 
-function traverse_leaves_pair!(bvh1, bvh2, src, contacts, num_src, ::Nothing, options)
+function traverse_leaves_pair!(
+    bvh1, bvh2, src, contacts, num_src,
+    cpu_extra::Tuple{Vector, Vector},
+    options,
+)
     # Traverse final level, only doing leaf-leaf checks
+    tasks, num_written = cpu_extra
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
@@ -549,8 +574,6 @@ function traverse_leaves_pair!(bvh1, bvh2, src, contacts, num_src, ::Nothing, op
 
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 1 dst elements per src element
-        tasks = Vector{Task}(undef, tp.num_tasks)
-        num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
             irange = tp[i]
             istart = irange.start

@@ -1,5 +1,11 @@
-function traverse_nodes!(bvh, src, dst, num_src, ::Nothing, level, self_checks, options)
+function traverse_nodes!(
+    bvh, src, dst, num_src,
+    cpu_extra::Tuple{Vector, Vector},
+    level, self_checks,
+    options,
+)
     # Traverse levels above leaves => no contacts, only further BVTT sprouting
+    tasks, num_written = cpu_extra
 
     # Compute number of virtual elements before this level to skip when computing the memory index
     virtual_nodes_level = bvh.tree.virtual_leaves >> (bvh.tree.levels - (level - 1))
@@ -19,8 +25,6 @@ function traverse_nodes!(bvh, src, dst, num_src, ::Nothing, level, self_checks, 
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 4 dst elements per src element
-        tasks = Vector{Task}(undef, tp.num_tasks)
-        num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
             irange = tp[i]
             istart = irange.start
@@ -57,9 +61,14 @@ end
 
 
 function traverse_nodes_range!(
-    bvh, src, dst, num_written, num_skips, self_checks, irange,
+    bvh::BVH,
+    src::AbstractVector, dst::AbstractVector,
+    num_written::Union{Nothing, SubArray},
+    num_skips::Integer,
+    self_checks::Bool,
+    irange::UnitRange,
 )
-    # Check src[irange[1]:irange[2]] and write to dst[1:num_dst]; dst should be given as a view
+    # Check src[irange[1]:irange[2]] and write to dst[1:num_dst]
     num_dst = 0
 
     # For each BVTT pair of nodes, check for contact
@@ -73,17 +82,17 @@ function traverse_nodes_range!(
             # If the right child is virtual, only add left child self-check
             if unsafe_isvirtual(bvh.tree, 2 * implicit1 + 1)
                 if self_checks
-                    dst[num_dst + 1] = (implicit1 * 2, implicit1 * 2)
+                    dst[num_dst + 1] = _leftleft(implicit1, implicit1)
                     num_dst += 1
                 end
             else
                 if self_checks
-                    dst[num_dst + 1] = (implicit1 * 2, implicit1 * 2)
-                    dst[num_dst + 2] = (implicit1 * 2, implicit1 * 2 + 1)
-                    dst[num_dst + 3] = (implicit1 * 2 + 1, implicit1 * 2 + 1)
+                    dst[num_dst + 1] = _leftleft(implicit1, implicit1)
+                    dst[num_dst + 2] = _leftright(implicit1, implicit1)
+                    dst[num_dst + 3] = _rightright(implicit1, implicit1)
                     num_dst += 3
                 else
-                    dst[num_dst + 1] = (implicit1 * 2, implicit1 * 2 + 1)
+                    dst[num_dst + 1] = _leftright(implicit1, implicit1)
                     num_dst += 1
                 end
             end
@@ -99,14 +108,14 @@ function traverse_nodes_range!(
                 # If the right node's right child is virtual, don't add that check. Guaranteed to
                 # always have node1 to the left of node2, hence its children will always be real
                 if unsafe_isvirtual(bvh.tree, 2 * implicit2 + 1)
-                    dst[num_dst + 1] = (implicit1 * 2, implicit2 * 2)
-                    dst[num_dst + 2] = (implicit1 * 2 + 1, implicit2 * 2)
+                    dst[num_dst + 1] = _leftleft(implicit1, implicit2)
+                    dst[num_dst + 2] = _rightleft(implicit1, implicit2)
                     num_dst += 2
                 else
-                    dst[num_dst + 1] = (implicit1 * 2, implicit2 * 2)
-                    dst[num_dst + 2] = (implicit1 * 2, implicit2 * 2 + 1)
-                    dst[num_dst + 3] = (implicit1 * 2 + 1, implicit2 * 2)
-                    dst[num_dst + 4] = (implicit1 * 2 + 1, implicit2 * 2 + 1)
+                    dst[num_dst + 1] = _leftleft(implicit1, implicit2)
+                    dst[num_dst + 2] = _leftright(implicit1, implicit2)
+                    dst[num_dst + 3] = _rightleft(implicit1, implicit2)
+                    dst[num_dst + 4] = _rightright(implicit1, implicit2)
                     num_dst += 4
                 end
             end
@@ -124,8 +133,9 @@ end
 
 
 
-function traverse_leaves!(bvh, src, contacts, num_src, ::Nothing, options)
+function traverse_leaves!(bvh, src, contacts, num_src, cpu_extra::Tuple{Vector, Vector}, options)
     # Traverse final level, only doing leaf-leaf checks
+    tasks, num_written = cpu_extra
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
@@ -141,8 +151,6 @@ function traverse_leaves!(bvh, src, contacts, num_src, ::Nothing, options)
 
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 1 dst elements per src element
-        tasks = Vector{Task}(undef, tp.num_tasks)
-        num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
             irange = tp[i]
             istart = irange.start
@@ -176,7 +184,7 @@ end
 function traverse_leaves_range!(
     bvh, src, contacts, num_written, irange
 )
-    # Check src[irange[1]:irange[2]] and write to dst[1:num_dst]; dst should be given as a view
+    # Check src[irange[1]:irange[2]] and write to dst[1:num_dst]
     num_dst = 0
 
     # Number of implicit indices above leaf-level

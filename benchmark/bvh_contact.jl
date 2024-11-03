@@ -45,7 +45,11 @@ display(@benchmark(traverse(bvh, bvh.tree.levels ÷ 2, traversal)))
 
 # Collect a pprof profile
 Profile.clear()
-@profile traverse(bvh)
+@profile begin
+    for _ in 1:1000
+        traverse(bvh, bvh.tree.levels ÷ 2, traversal)
+    end
+end
 
 # Export pprof profile and open interactive profiling web interface.
 pprof(; out="bvh_contact.pb.gz")

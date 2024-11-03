@@ -194,11 +194,10 @@ Only fundamental Julia types are used - e.g. `struct`, `Tuple`, `UInt`, `Float64
 # Roadmap
 
 - Raytracing
-- Atomics on Metal and oneAPI - waiting on Atomix.jl
+- Atomics on Metal and oneAPI - waiting on Atomix.jl ([Metal Issue](https://github.com/JuliaGPU/Metal.jl/issues/218), [oneAPI Issue](https://github.com/JuliaGPU/oneAPI.jl/issues/336)).
 - Coherent types for indices on GPUs (e.g. when using Int32 in core kernels, only use 32-bit objects)
 - Avoiding / exposing memory allocations (temps, minmax reduce, morton order, etc.)
 - GPU CI
-- Reuse threading `Vector{Task}`.
 
 
 # References

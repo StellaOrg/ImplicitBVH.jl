@@ -65,12 +65,16 @@ function traverse(
     bvtt1, bvtt2, num_bvtt = initial_bvtt(bvh, start_level, cache, options)
     num_checks = num_bvtt
 
-    # For GPUs we need an additional global offset to coordinate writing results
-    dst_offsets = if bvtt1 isa AbstractGPUVector
+    # Known at compile time, even though branches have different types
+    extra = if bvtt1 isa AbstractGPUVector
+        # For GPUs we need an additional global offset to coordinate writing results
         backend = get_backend(bvtt1)
         KernelAbstractions.zeros(backend, I, Int(bvh.tree.levels))
     else
-        nothing
+        # For CPUs we need a vector of spawned tasks and a contact counter for each task
+        tasks = Vector{Task}(undef, options.num_threads)
+        num_written = Vector{Int}(undef, options.num_threads)
+        (tasks, num_written)
     end
 
     level = start_level
@@ -82,7 +86,7 @@ function traverse(
         # second-to-last level as leaf self-checks are pointless
         self_checks = level < bvh.tree.levels - 1
         num_bvtt = traverse_nodes!(bvh, bvtt1, bvtt2,
-                                   num_bvtt, dst_offsets, level,
+                                   num_bvtt, extra, level,
                                    self_checks, options)
         num_checks += num_bvtt
 
@@ -93,7 +97,7 @@ function traverse(
 
     # Arrived at final leaf level, now populating contact list
     length(bvtt2) < num_bvtt && resize!(bvtt2, num_bvtt)
-    num_bvtt = traverse_leaves!(bvh, bvtt1, bvtt2, num_bvtt, dst_offsets, options)
+    num_bvtt = traverse_leaves!(bvh, bvtt1, bvtt2, num_bvtt, extra, options)
 
     # Return contact list and the other buffer as possible cache
     BVHTraversal(start_level, num_checks, num_bvtt, bvtt2, bvtt1)
