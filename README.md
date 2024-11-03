@@ -1,13 +1,16 @@
-[![ImplicitBVH](https://github.com/StellaOrg/ImplicitBVH.jl/blob/main/docs/src/static/bunny.png?raw=true)](https://stellaorg.github.io/ImplicitBVH.jl/)
+[![ImplicitBVH](https://github.com/StellaOrg/ImplicitBVH.jl/blob/main/docs/src/assets/logo.png?raw=true)](https://stellaorg.github.io/ImplicitBVH.jl/)
+[![ImplicitBVH](https://github.com/StellaOrg/ImplicitBVH.jl/blob/main/docs/src/assets/bunny.png?raw=true)](https://stellaorg.github.io/ImplicitBVH.jl/)
 
 
-[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/stable)
-[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/dev)
+[![Docs Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/stable)
+[![Docs Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/dev)
+[![Build Status](https://github.com/StellaOrg/ImplicitBVH.jl/workflows/CI/badge.svg)](https://github.com/StellaOrg/ImplicitBVH.jl/actions?query=workflow%3ACI+branch%3Amaster)
+
 
 # ImplicitBVH.jl
-*High-Performance Cross-Architecture Bounding Volume Hierarchy for Collision Detection*
+*High-Performance Cross-Architecture Bounding Volume Hierarchy for Collision Detection and Ray Tracing*
 
-**New in v0.5.0: GPU acceleration via [AcceleratedKernels.jl](https://github.com/anicusan/AcceleratedKernels.jl)/[KernelAbstractions.jl](https://github.com/JuliaGPU/KernelAbstractions.jl) targeting all JuliaGPU backends, i.e. Nvidia CUDA, AMD ROCm, Intel oneAPI, Apple Metal.**
+**New in v0.5.0: Ray Tracing and GPU acceleration via [AcceleratedKernels.jl](https://github.com/anicusan/AcceleratedKernels.jl)/[KernelAbstractions.jl](https://github.com/JuliaGPU/KernelAbstractions.jl) targeting all JuliaGPU backends, i.e. Nvidia CUDA, AMD ROCm, Intel oneAPI, Apple Metal.**
 
 It uses an implicit bounding volume hierarchy constructed from an iterable of some geometric
 primitives' (e.g. triangles in a mesh) bounding volumes forming the `ImplicitTree` leaves. The leaves

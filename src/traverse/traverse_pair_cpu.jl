@@ -10,14 +10,14 @@ function traverse_nodes_pair!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, 
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
-    tp = TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
+    tp = AK.TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
     if tp.num_tasks == 1
         num_dst = traverse_nodes_pair_range!(
             bvh1, bvh2,
             src, dst, nothing,
             virtual_nodes_before1,
             virtual_nodes_before2,
-            (1, num_src),
+            1:num_src,
         )
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
@@ -25,13 +25,12 @@ function traverse_nodes_pair!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, 
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
-            istart, iend = tp[i]
             tasks[i] = Threads.@spawn traverse_nodes_pair_range!(
                 bvh1, bvh2,
                 src, view(dst, 4istart - 3:4iend), view(num_written, i),
                 virtual_nodes_before1,
                 virtual_nodes_before2,
-                (istart, iend),
+                tp[i],
             )
         end
 
@@ -43,7 +42,7 @@ function traverse_nodes_pair!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, 
 
             # Repack written contacts by the second, third thread, etc.
             if i > 1
-                istart, iend = tp[i]
+                istart = tp[i].start
                 for j in 1:task_num_written
                     dst[num_dst + j] = dst[4istart - 3 + j - 1]
                 end
@@ -63,7 +62,7 @@ function traverse_nodes_pair_range!(
     num_dst = 0
 
     # For each BVTT pair of nodes, check for contact
-    @inbounds for i in irange[1]:irange[2]
+    @inbounds for i in irange
         # Extract implicit indices of BVH nodes to test
         implicit1, implicit2 = src[i]
 
@@ -130,14 +129,14 @@ function traverse_nodes_left!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, 
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
-    tp = TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
+    tp = AK.TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
     if tp.num_tasks == 1
         num_dst = traverse_nodes_left_range!(
             bvh1, bvh2,
             src, dst, nothing,
             virtual_nodes_before1,
             virtual_nodes_before2,
-            (1, num_src),
+            1:num_src,
         )
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
@@ -145,13 +144,12 @@ function traverse_nodes_left!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, 
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
-            istart, iend = tp[i]
             tasks[i] = Threads.@spawn traverse_nodes_left_range!(
                 bvh1, bvh2,
                 src, view(dst, 2istart - 1:2iend), view(num_written, i),
                 virtual_nodes_before1,
                 virtual_nodes_before2,
-                (istart, iend),
+                tp[i],
             )
         end
 
@@ -163,7 +161,7 @@ function traverse_nodes_left!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, 
 
             # Repack written contacts by the second, third thread, etc.
             if i > 1
-                istart, iend = tp[i]
+                istart = tp[i].start
                 for j in 1:task_num_written
                     dst[num_dst + j] = dst[2istart - 1 + j - 1]
                 end
@@ -184,7 +182,7 @@ function traverse_nodes_left_range!(
 
     # For each BVTT pair of nodes, check for contact. Only expand BVTT for BVH1, as BVH2 is already
     # one above leaf level
-    @inbounds for i in irange[1]:irange[2]
+    @inbounds for i in irange
         # Extract implicit indices of BVH nodes to test
         implicit1, implicit2 = src[i]
 
@@ -231,14 +229,14 @@ function traverse_nodes_right!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1,
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
-    tp = TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
+    tp = AK.TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
     if tp.num_tasks == 1
         num_dst = traverse_nodes_right_range!(
             bvh1, bvh2,
             src, dst, nothing,
             virtual_nodes_before1,
             virtual_nodes_before2,
-            (1, num_src),
+            1:num_src,
         )
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
@@ -246,13 +244,12 @@ function traverse_nodes_right!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1,
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
-            istart, iend = tp[i]
             tasks[i] = Threads.@spawn traverse_nodes_right_range!(
                 bvh1, bvh2,
                 src, view(dst, 2istart - 1:2iend), view(num_written, i),
                 virtual_nodes_before1,
                 virtual_nodes_before2,
-                (istart, iend),
+                tp[i],
             )
         end
 
@@ -264,7 +261,7 @@ function traverse_nodes_right!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1,
 
             # Repack written contacts by the second, third thread, etc.
             if i > 1
-                istart, iend = tp[i]
+                istart = tp[i].start
                 for j in 1:task_num_written
                     dst[num_dst + j] = dst[2istart - 1 + j - 1]
                 end
@@ -285,7 +282,7 @@ function traverse_nodes_right_range!(
 
     # For each BVTT pair of nodes, check for contact. Only expand BVTT for BVH2, as BVH1 is already
     # one above leaf level
-    @inbounds for i in irange[1]:irange[2]
+    @inbounds for i in irange
         # Extract implicit indices of BVH nodes to test
         implicit1, implicit2 = src[i]
 
@@ -329,13 +326,13 @@ function traverse_nodes_leaves_left!(bvh1, bvh2, src, dst, num_src, ::Nothing, l
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
-    tp = TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
+    tp = AK.TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
     if tp.num_tasks == 1
         num_dst = traverse_nodes_leaves_left_range!(
             bvh1, bvh2,
             src, dst, nothing,
             virtual_nodes_before1,
-            (1, num_src),
+            1:num_src,
         )
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
@@ -343,12 +340,11 @@ function traverse_nodes_leaves_left!(bvh1, bvh2, src, dst, num_src, ::Nothing, l
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
-            istart, iend = tp[i]
             tasks[i] = Threads.@spawn traverse_nodes_leaves_left_range!(
                 bvh1, bvh2,
                 src, view(dst, 2istart - 1:2iend), view(num_written, i),
                 virtual_nodes_before1,
-                (istart, iend),
+                tp[i],
             )
         end
 
@@ -360,7 +356,7 @@ function traverse_nodes_leaves_left!(bvh1, bvh2, src, dst, num_src, ::Nothing, l
 
             # Repack written contacts by the second, third thread, etc.
             if i > 1
-                istart, iend = tp[i]
+                istart = tp[i].start
                 for j in 1:task_num_written
                     dst[num_dst + j] = dst[2istart - 1 + j - 1]
                 end
@@ -384,7 +380,7 @@ function traverse_nodes_leaves_left_range!(
 
     # For each BVTT pair of nodes, check for contact. Only expand BVTT for BVH1, as BVH2 is already
     # at leaf level
-    @inbounds for i in irange[1]:irange[2]
+    @inbounds for i in irange
         # Extract implicit indices of BVH nodes to test
         implicit1, implicit2 = src[i]
 
@@ -430,13 +426,13 @@ function traverse_nodes_leaves_right!(bvh1, bvh2, src, dst, num_src, ::Nothing, 
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
-    tp = TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
+    tp = AK.TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
     if tp.num_tasks == 1
         num_dst = traverse_nodes_leaves_right_range!(
             bvh1, bvh2,
             src, dst, nothing,
             virtual_nodes_before2,
-            (1, num_src),
+            1:num_src,
         )
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
@@ -444,12 +440,11 @@ function traverse_nodes_leaves_right!(bvh1, bvh2, src, dst, num_src, ::Nothing, 
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
-            istart, iend = tp[i]
             tasks[i] = Threads.@spawn traverse_nodes_leaves_right_range!(
                 bvh1, bvh2,
                 src, view(dst, 2istart - 1:2iend), view(num_written, i),
                 virtual_nodes_before2,
-                (istart, iend),
+                tp[i],
             )
         end
 
@@ -461,7 +456,7 @@ function traverse_nodes_leaves_right!(bvh1, bvh2, src, dst, num_src, ::Nothing, 
 
             # Repack written contacts by the second, third thread, etc.
             if i > 1
-                istart, iend = tp[i]
+                istart = tp[i].start
                 for j in 1:task_num_written
                     dst[num_dst + j] = dst[2istart - 1 + j - 1]
                 end
@@ -485,7 +480,7 @@ function traverse_nodes_leaves_right_range!(
 
     # For each BVTT pair of nodes, check for contact. Only expand BVTT for BVH2, as BVH1 is already
     # at leaf level
-    @inbounds for i in irange[1]:irange[2]
+    @inbounds for i in irange
         # Extract implicit indices of BVH nodes to test
         implicit1, implicit2 = src[i]
 
@@ -527,12 +522,12 @@ function traverse_leaves_pair!(bvh1, bvh2, src, contacts, num_src, ::Nothing, op
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
-    tp = TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
+    tp = AK.TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
     if tp.num_tasks == 1
         num_contacts = traverse_leaves_pair_range!(
             bvh1, bvh2,
             src, view(contacts, :), nothing,
-            (1, num_src),
+            1:num_src,
         )
     else
         num_contacts = 0
@@ -542,11 +537,10 @@ function traverse_leaves_pair!(bvh1, bvh2, src, contacts, num_src, ::Nothing, op
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
-            istart, iend = tp[i]
             tasks[i] = Threads.@spawn traverse_leaves_pair_range!(
                 bvh1, bvh2,
                 src, view(contacts, istart:iend), view(num_written, i),
-                (istart, iend),
+                tp[i],
             )
         end
         @inbounds for i in 1:tp.num_tasks
@@ -555,7 +549,7 @@ function traverse_leaves_pair!(bvh1, bvh2, src, contacts, num_src, ::Nothing, op
 
             # Repack written contacts by the second, third thread, etc.
             if i > 1
-                istart, iend = tp[i]
+                istart = tp[i].start
                 for j in 1:task_num_written
                     contacts[num_contacts + j] = contacts[istart + j - 1]
                 end
@@ -579,7 +573,7 @@ function traverse_leaves_pair_range!(
     num_above2 = pow2(bvh2.tree.levels - 1) - 1
 
     # For each BVTT pair of nodes, check for contact
-    @inbounds for i in irange[1]:irange[2]
+    @inbounds for i in irange
         # Extract implicit indices of BVH leaves to test
         implicit1, implicit2 = src[i]
 
