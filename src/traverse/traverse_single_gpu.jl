@@ -1,6 +1,29 @@
+function traverse_nodes!(bvh, src::AbstractGPUVector, dst::AbstractGPUVector,
+                         num_src, dst_offsets, level, self_checks, options)
+    # Traverse levels above leaves => no contacts, only further BVTT sprouting
+
+    # Compute number of virtual elements before this level to skip when computing the memory index
+    virtual_nodes_level = bvh.tree.virtual_leaves >> (bvh.tree.levels - (level - 1))
+    virtual_nodes_before = 2 * virtual_nodes_level - count_ones(virtual_nodes_level)
+
+    block_size = options.block_size
+    num_blocks = (num_src + block_size - 1) ÷ block_size
+    backend = get_backend(src)
+
+    kernel! = _traverse_nodes_gpu!(backend, block_size)
+    kernel!(bvh.tree, bvh.nodes, src, dst, num_src, dst_offsets, level, virtual_nodes_before, self_checks,
+    ndrange=num_blocks * block_size)
+
+    # We need to know how many checks we have written into dst
+    @allowscalar dst_offsets[level]
+end
+
+
+
+
 @kernel cpu=false inbounds=true function _traverse_nodes_gpu!(
-    tree, nodes,
-    src, dst,
+    tree, @Const(nodes),
+    @Const(src), dst,
     num_src, dst_offsets, level,
     num_skips, self_checks,
 )
@@ -93,33 +116,31 @@ end
 
 
 
-function traverse_nodes!(bvh, src::AbstractGPUVector, dst::AbstractGPUVector,
-                         num_src, dst_offsets, level, self_checks, options)
-    # Traverse levels above leaves => no contacts, only further BVTT sprouting
+function traverse_leaves!(bvh, src::AbstractGPUVector, contacts::AbstractGPUVector,
+                          num_src, dst_offsets, options)
+    # Traverse final level, only doing leaf-leaf checks
 
-    # Compute number of virtual elements before this level to skip when computing the memory index
-    virtual_nodes_level = bvh.tree.virtual_leaves >> (bvh.tree.levels - (level - 1))
-    virtual_nodes_before = 2 * virtual_nodes_level - count_ones(virtual_nodes_level)
+    # Number of implicit indices above leaf-level
+    num_skips = pow2(bvh.tree.levels - 1) - 1
 
     block_size = options.block_size
     num_blocks = (num_src + block_size - 1) ÷ block_size
     backend = get_backend(src)
 
-    kernel! = _traverse_nodes_gpu!(backend, block_size)
-    kernel!(bvh.tree, bvh.nodes, src, dst, num_src, dst_offsets, level, virtual_nodes_before, self_checks,
+    kernel! = _traverse_leaves_gpu!(backend, block_size)
+    kernel!(bvh.leaves, bvh.order, src, contacts, num_src, dst_offsets, num_skips,
             ndrange=num_blocks * block_size)
 
-    # We need to know how many checks we have written into dst
-    synchronize(backend)
-    @allowscalar dst_offsets[level]
+    # We need to know how many pairs we have written into contacts
+    @allowscalar dst_offsets[end]
 end
 
 
 
 
 @kernel cpu=false inbounds=true function _traverse_leaves_gpu!(
-    leaves, order,
-    src, dst,
+    @Const(leaves), @Const(order),
+    @Const(src), dst,
     num_src, dst_offsets,
     num_skips,
 )
@@ -178,25 +199,3 @@ end
         dst[offset + ithread] = temp[ithread]
     end
 end
-
-
-function traverse_leaves!(bvh, src::AbstractGPUVector, contacts::AbstractGPUVector,
-                          num_src, dst_offsets, options)
-    # Traverse final level, only doing leaf-leaf checks
-
-    # Number of implicit indices above leaf-level
-    num_skips = pow2(bvh.tree.levels - 1) - 1
-
-    block_size = options.block_size
-    num_blocks = (num_src + block_size - 1) ÷ block_size
-    backend = get_backend(src)
-
-    kernel! = _traverse_leaves_gpu!(backend, block_size)
-    kernel!(bvh.leaves, bvh.order, src, contacts, num_src, dst_offsets, num_skips,
-            ndrange=num_blocks * block_size)
-
-    # We need to know how many pairs we have written into contacts
-    synchronize(backend)
-    @allowscalar dst_offsets[end]
-end
-

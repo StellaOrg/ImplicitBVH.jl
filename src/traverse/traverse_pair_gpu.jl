@@ -26,15 +26,14 @@ function traverse_nodes_pair!(bvh1, bvh2, src::AbstractGPUVector, dst::AbstractG
     )
 
     # We need to know how many checks we have written into dst
-    synchronize(backend)
     @allowscalar dst_offsets[idst_offsets]
 end
 
 
 @kernel cpu=false inbounds=true function _traverse_nodes_pair_gpu!(
     tree1, tree2,
-    nodes1, nodes2,
-    src, dst, num_src, dst_offsets, idst_offsets,
+    @Const(nodes1), @Const(nodes2),
+    @Const(src), dst, num_src, dst_offsets, idst_offsets,
     num_skips1, num_skips2,
 )
     # Group (block) and local (thread) indices
@@ -147,15 +146,14 @@ function traverse_nodes_left!(bvh1, bvh2, src::AbstractGPUVector, dst::AbstractG
     )
 
     # We need to know how many checks we have written into dst
-    synchronize(backend)
     @allowscalar dst_offsets[idst_offsets]
 end
 
 
 @kernel cpu=false inbounds=true function _traverse_nodes_left_gpu!(
     tree1, tree2,
-    nodes1, nodes2,
-    src, dst, num_src, dst_offsets, idst_offsets,
+    @Const(nodes1), @Const(nodes2),
+    @Const(src), dst, num_src, dst_offsets, idst_offsets,
     num_skips1, num_skips2,
 )
     # Group (block) and local (thread) indices
@@ -250,15 +248,14 @@ function traverse_nodes_right!(bvh1, bvh2, src::AbstractGPUVector, dst::Abstract
     )
 
     # We need to know how many checks we have written into dst
-    synchronize(backend)
     @allowscalar dst_offsets[idst_offsets]
 end
 
 
 @kernel cpu=false inbounds=true function _traverse_nodes_right_gpu!(
     tree1, tree2,
-    nodes1, nodes2,
-    src, dst, num_src, dst_offsets, idst_offsets,
+    @Const(nodes1), @Const(nodes2),
+    @Const(src), dst, num_src, dst_offsets, idst_offsets,
     num_skips1, num_skips2,
 )
     # Group (block) and local (thread) indices
@@ -352,15 +349,14 @@ function traverse_nodes_leaves_left!(bvh1, bvh2, src::AbstractGPUVector, dst::Ab
     )
 
     # We need to know how many checks we have written into dst
-    synchronize(backend)
     @allowscalar dst_offsets[idst_offsets]
 end
 
 
 @kernel cpu=false inbounds=true function _traverse_nodes_leaves_left_gpu!(
     tree1, tree2,
-    nodes1, leaves2, order2,
-    src, dst, num_src, dst_offsets, idst_offsets,
+    @Const(nodes1), @Const(leaves2), @Const(order2),
+    @Const(src), dst, num_src, dst_offsets, idst_offsets,
     num_skips1, num_above2,
 )
     # Group (block) and local (thread) indices
@@ -456,15 +452,14 @@ function traverse_nodes_leaves_right!(bvh1, bvh2, src::AbstractGPUVector, dst::A
     )
 
     # We need to know how many checks we have written into dst
-    synchronize(backend)
     @allowscalar dst_offsets[idst_offsets]
 end
 
 
 @kernel cpu=false inbounds=true function _traverse_nodes_leaves_right_gpu!(
     tree1, tree2,
-    leaves1, nodes2, order1,
-    src, dst, num_src, dst_offsets, idst_offsets,
+    @Const(leaves1), @Const(nodes2), @Const(order1),
+    @Const(src), dst, num_src, dst_offsets, idst_offsets,
     num_above1, num_skips2,
 )
     # Group (block) and local (thread) indices
@@ -552,14 +547,13 @@ function traverse_leaves_pair!(bvh1, bvh2, src::AbstractGPUVector, contacts::Abs
     )
 
     # We need to know how many checks we have written into dst
-    synchronize(backend)
     @allowscalar dst_offsets[end]
 end
 
 
 @kernel cpu=false inbounds=true function _traverse_leaves_pair_gpu!(
-    leaves1, leaves2, order1, order2,
-    src, dst,
+    @Const(leaves1), @Const(leaves2), @Const(order1), @Const(order2),
+    @Const(src), dst,
     num_src, dst_offsets,
     num_above1, num_above2,
 )
@@ -614,4 +608,3 @@ end
         dst[offset + ithread] = temp[ithread]
     end
 end
-
