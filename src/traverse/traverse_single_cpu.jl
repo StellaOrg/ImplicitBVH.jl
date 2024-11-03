@@ -1,3 +1,58 @@
+function traverse_nodes!(bvh, src, dst, num_src, ::Nothing, level, self_checks, options)
+    # Traverse levels above leaves => no contacts, only further BVTT sprouting
+
+    # Compute number of virtual elements before this level to skip when computing the memory index
+    virtual_nodes_level = bvh.tree.virtual_leaves >> (bvh.tree.levels - (level - 1))
+    virtual_nodes_before = 2 * virtual_nodes_level - count_ones(virtual_nodes_level)
+
+    # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
+    # is needed, inline call
+    tp = AK.TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
+    if tp.num_tasks == 1
+        num_dst = traverse_nodes_range!(
+            bvh,
+            src, dst, nothing,
+            virtual_nodes_before,
+            self_checks,
+            1:num_src,
+        )
+    else
+        # Keep track of tasks launched and number of elements written by each task in their unique
+        # memory region. The unique region is equal to 4 dst elements per src element
+        tasks = Vector{Task}(undef, tp.num_tasks)
+        num_written = Vector{Int}(undef, tp.num_tasks)
+        @inbounds for i in 1:tp.num_tasks
+            tasks[i] = Threads.@spawn traverse_nodes_range!(
+                bvh,
+                src, view(dst, 4istart - 3:4iend), view(num_written, i),
+                virtual_nodes_before,
+                self_checks,
+                tp[i],
+            )
+        end
+
+        # As tasks finish sequentially, move the new written contacts into contiguous region
+        num_dst = 0
+        @inbounds for i in 1:tp.num_tasks
+            wait(tasks[i])
+            task_num_written = num_written[i]
+
+            # Repack written contacts by the second, third thread, etc.
+            if i > 1
+                istart = tp[i].start
+                for j in 1:task_num_written
+                    dst[num_dst + j] = dst[4istart - 3 + j - 1]
+                end
+            end
+            num_dst += task_num_written
+        end
+    end
+
+    num_dst
+end
+
+
+
 function traverse_nodes_range!(
     bvh, src, dst, num_written, num_skips, self_checks, irange,
 )
@@ -5,7 +60,7 @@ function traverse_nodes_range!(
     num_dst = 0
 
     # For each BVTT pair of nodes, check for contact
-    @inbounds for i in irange[1]:irange[2]
+    @inbounds for i in irange
         # Extract implicit indices of BVH nodes to test
         implicit1, implicit2 = src[i]
 
@@ -66,58 +121,48 @@ end
 
 
 
-function traverse_nodes!(bvh, src, dst, num_src, ::Nothing, level, self_checks, options)
-    # Traverse levels above leaves => no contacts, only further BVTT sprouting
-
-    # Compute number of virtual elements before this level to skip when computing the memory index
-    virtual_nodes_level = bvh.tree.virtual_leaves >> (bvh.tree.levels - (level - 1))
-    virtual_nodes_before = 2 * virtual_nodes_level - count_ones(virtual_nodes_level)
+function traverse_leaves!(bvh, src, contacts, num_src, ::Nothing, options)
+    # Traverse final level, only doing leaf-leaf checks
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
-    tp = TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
+    tp = AK.TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
     if tp.num_tasks == 1
-        num_dst = traverse_nodes_range!(
+        num_contacts = traverse_leaves_range!(
             bvh,
-            src, dst, nothing,
-            virtual_nodes_before,
-            self_checks,
-            (1, num_src),
+            src, view(contacts, :), nothing,
+            1:num_src,
         )
     else
+        num_contacts = 0
+
         # Keep track of tasks launched and number of elements written by each task in their unique
-        # memory region. The unique region is equal to 4 dst elements per src element
+        # memory region. The unique region is equal to 1 dst elements per src element
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
-            istart, iend = tp[i]
-            tasks[i] = Threads.@spawn traverse_nodes_range!(
+            tasks[i] = Threads.@spawn traverse_leaves_range!(
                 bvh,
-                src, view(dst, 4istart - 3:4iend), view(num_written, i),
-                virtual_nodes_before,
-                self_checks,
-                (istart, iend),
+                src, view(contacts, istart:iend), view(num_written, i),
+                tp[i],
             )
         end
-
-        # As tasks finish sequentially, move the new written contacts into contiguous region
-        num_dst = 0
         @inbounds for i in 1:tp.num_tasks
             wait(tasks[i])
             task_num_written = num_written[i]
 
             # Repack written contacts by the second, third thread, etc.
             if i > 1
-                istart, iend = tp[i]
+                istart = tp[i].start
                 for j in 1:task_num_written
-                    dst[num_dst + j] = dst[4istart - 3 + j - 1]
+                    contacts[num_contacts + j] = contacts[istart + j - 1]
                 end
             end
-            num_dst += task_num_written
+            num_contacts += task_num_written
         end
     end
 
-    num_dst
+    num_contacts
 end
 
 
@@ -132,7 +177,7 @@ function traverse_leaves_range!(
     num_above = pow2(bvh.tree.levels - 1) - 1
 
     # For each BVTT pair of nodes, check for contact
-    @inbounds for i in irange[1]:irange[2]
+    @inbounds for i in irange
 
         # Extract implicit indices of BVH leaves to test
         implicit1, implicit2 = src[i]
@@ -161,50 +206,3 @@ function traverse_leaves_range!(
         return nothing
     end
 end
-
-
-function traverse_leaves!(bvh, src, contacts, num_src, ::Nothing, options)
-    # Traverse final level, only doing leaf-leaf checks
-
-    # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
-    # is needed, inline call
-    tp = TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
-    if tp.num_tasks == 1
-        num_contacts = traverse_leaves_range!(
-            bvh,
-            src, view(contacts, :), nothing,
-            (1, num_src),
-        )
-    else
-        num_contacts = 0
-
-        # Keep track of tasks launched and number of elements written by each task in their unique
-        # memory region. The unique region is equal to 1 dst elements per src element
-        tasks = Vector{Task}(undef, tp.num_tasks)
-        num_written = Vector{Int}(undef, tp.num_tasks)
-        @inbounds for i in 1:tp.num_tasks
-            istart, iend = tp[i]
-            tasks[i] = Threads.@spawn traverse_leaves_range!(
-                bvh,
-                src, view(contacts, istart:iend), view(num_written, i),
-                (istart, iend),
-            )
-        end
-        @inbounds for i in 1:tp.num_tasks
-            wait(tasks[i])
-            task_num_written = num_written[i]
-
-            # Repack written contacts by the second, third thread, etc.
-            if i > 1
-                istart, iend = tp[i]
-                for j in 1:task_num_written
-                    contacts[num_contacts + j] = contacts[istart + j - 1]
-                end
-            end
-            num_contacts += task_num_written
-        end
-    end
-
-    num_contacts
-end
-

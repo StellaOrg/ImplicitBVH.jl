@@ -1,5 +1,5 @@
 """
-    $(TYPEDEF)
+    const IndexPair{I} = Tuple{I, I}
 
 Alias for a tuple of two indices representing e.g. a contacting pair.
 """
