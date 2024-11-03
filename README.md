@@ -4,7 +4,7 @@
 
 [![Docs Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/stable)
 [![Docs Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/dev)
-[![Build Status](https://github.com/StellaOrg/ImplicitBVH.jl/workflows/CI/badge.svg)](https://github.com/StellaOrg/ImplicitBVH.jl/actions?query=workflow%3ACI+branch%3Amaster)
+[![Build Status](https://github.com/StellaOrg/ImplicitBVH.jl/workflows/CI/badge.svg)](https://github.com/StellaOrg/ImplicitBVH.jl/actions/workflows/ci.yml)
 
 
 # ImplicitBVH.jl
@@ -198,6 +198,7 @@ Only fundamental Julia types are used - e.g. `struct`, `Tuple`, `UInt`, `Float64
 - Coherent types for indices on GPUs (e.g. when using Int32 in core kernels, only use 32-bit objects)
 - Avoiding / exposing memory allocations (temps, minmax reduce, morton order, etc.)
 - GPU CI
+- Reuse threading `Vector{Task}`.
 
 
 # References

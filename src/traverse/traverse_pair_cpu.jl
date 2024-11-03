@@ -25,12 +25,15 @@ function traverse_nodes_pair!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, 
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
+            irange = tp[i]
+            istart = irange.start
+            iend = irange.stop
             tasks[i] = Threads.@spawn traverse_nodes_pair_range!(
                 bvh1, bvh2,
                 src, view(dst, 4istart - 3:4iend), view(num_written, i),
                 virtual_nodes_before1,
                 virtual_nodes_before2,
-                tp[i],
+                irange,
             )
         end
 
@@ -144,12 +147,15 @@ function traverse_nodes_left!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1, 
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
+            irange = tp[i]
+            istart = irange.start
+            iend = irange.stop
             tasks[i] = Threads.@spawn traverse_nodes_left_range!(
                 bvh1, bvh2,
                 src, view(dst, 2istart - 1:2iend), view(num_written, i),
                 virtual_nodes_before1,
                 virtual_nodes_before2,
-                tp[i],
+                irange,
             )
         end
 
@@ -244,12 +250,15 @@ function traverse_nodes_right!(bvh1, bvh2, src, dst, num_src, ::Nothing, level1,
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
+            irange = tp[i]
+            istart = irange.start
+            iend = irange.stop
             tasks[i] = Threads.@spawn traverse_nodes_right_range!(
                 bvh1, bvh2,
                 src, view(dst, 2istart - 1:2iend), view(num_written, i),
                 virtual_nodes_before1,
                 virtual_nodes_before2,
-                tp[i],
+                irange,
             )
         end
 
@@ -340,11 +349,14 @@ function traverse_nodes_leaves_left!(bvh1, bvh2, src, dst, num_src, ::Nothing, l
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
+            irange = tp[i]
+            istart = irange.start
+            iend = irange.stop
             tasks[i] = Threads.@spawn traverse_nodes_leaves_left_range!(
                 bvh1, bvh2,
                 src, view(dst, 2istart - 1:2iend), view(num_written, i),
                 virtual_nodes_before1,
-                tp[i],
+                irange,
             )
         end
 
@@ -440,11 +452,14 @@ function traverse_nodes_leaves_right!(bvh1, bvh2, src, dst, num_src, ::Nothing, 
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
+            irange = tp[i]
+            istart = irange.start
+            iend = irange.stop
             tasks[i] = Threads.@spawn traverse_nodes_leaves_right_range!(
                 bvh1, bvh2,
                 src, view(dst, 2istart - 1:2iend), view(num_written, i),
                 virtual_nodes_before2,
-                tp[i],
+                irange,
             )
         end
 
@@ -537,10 +552,13 @@ function traverse_leaves_pair!(bvh1, bvh2, src, contacts, num_src, ::Nothing, op
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
+            irange = tp[i]
+            istart = irange.start
+            iend = irange.stop
             tasks[i] = Threads.@spawn traverse_leaves_pair_range!(
                 bvh1, bvh2,
                 src, view(contacts, istart:iend), view(num_written, i),
-                tp[i],
+                irange,
             )
         end
         @inbounds for i in 1:tp.num_tasks

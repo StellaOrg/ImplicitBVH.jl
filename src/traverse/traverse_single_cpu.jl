@@ -22,12 +22,15 @@ function traverse_nodes!(bvh, src, dst, num_src, ::Nothing, level, self_checks, 
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
+            irange = tp[i]
+            istart = irange.start
+            iend = irange.stop
             tasks[i] = Threads.@spawn traverse_nodes_range!(
                 bvh,
                 src, view(dst, 4istart - 3:4iend), view(num_written, i),
                 virtual_nodes_before,
                 self_checks,
-                tp[i],
+                irange,
             )
         end
 
@@ -141,10 +144,13 @@ function traverse_leaves!(bvh, src, contacts, num_src, ::Nothing, options)
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
+            irange = tp[i]
+            istart = irange.start
+            iend = irange.stop
             tasks[i] = Threads.@spawn traverse_leaves_range!(
                 bvh,
                 src, view(contacts, istart:iend), view(num_written, i),
-                tp[i],
+                irange,
             )
         end
         @inbounds for i in 1:tp.num_tasks
