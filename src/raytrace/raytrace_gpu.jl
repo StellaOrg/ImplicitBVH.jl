@@ -6,6 +6,7 @@ function traverse_rays_nodes!(bvh, points, directions, src, dst, num_src, dst_of
     virtual_nodes_before = 2 * virtual_nodes_level - count_ones(virtual_nodes_level)
 
     block_size = options.block_size
+    num_blocks = (num_src + block_size - 1) ÷ block_size
     backend = get_backend(src)
 
     kernel! = _traverse_rays_nodes_gpu!(backend, block_size)
@@ -13,9 +14,13 @@ function traverse_rays_nodes!(bvh, points, directions, src, dst, num_src, dst_of
         bvh.tree, bvh.nodes, points, directions,
         src, dst, num_src, dst_offsets, 
         virtual_nodes_before,
+        ndrange=num_blocks * block_size,
     )
-
+    
+    # We need to know how many checks we have written into dst
+    @allowscalar dst_offsets[level]
 end
+
 
 @kernel cpu=false inbounds=true function _traverse_rays_nodes_gpu!(
     tree, nodes, points, directions,
@@ -107,7 +112,6 @@ function traverse_rays_leaves!(
     )
 
     # We need to know how many checks we have written into dst
-    synchronize(backend)
     @allowscalar dst_offsets[end]
 end
 

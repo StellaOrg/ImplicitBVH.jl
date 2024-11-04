@@ -8,12 +8,66 @@ Check if two bounding volumes are touching or inter-penetrating.
 """
 function iscontact end
 
+"""
+    isintersection(b::BBox, p::Type{3, T}, d::Type{3, T})
+    isintersection(s::BSphere, p::Type{3, T}, d::Type{3, T})
+
+Return True if ray intersects a sphere or box
+"""
+
+# will go into bounding volumes
+function isintersection end
+
+"""
+# Examples
+
+Simple ray bounding box intersection example:
+
+```jldoctest
+using ImplicitBVH
+using ImplicitBVH: BSphere, BBox, isintersection
+
+# Generate a simple bounding box
+
+bounding_box = BBox((0., 0., 0.), (1., 1., 1.))
+
+# Generate a ray passing up and through the bottom face of the bounding box
+
+point = [.5, .5, -10]
+direction = [0, 0, 1]
+isintersection(bounding_box, point, direction)
+
+# output
+true
+```
+
+Simple ray bounding sphere intersection example:
+
+```jldoctest
+using ImplicitBVH
+using ImplicitBVH: BSphere, BBox, isintersection
+
+# Generate a simple bounding sphere
+
+bounding_sphere = BSphere((0., 0., 0.), 0.5)
+
+# Generate a ray passing up and through the bounding sphere
+
+point = [0, 0, -10]
+direction = [0, 0, 1]
+isintersection(bounding_sphere, point, direction)
+
+# output
+true
+```
+"""
 
 """
     center(b::BSphere)
     center(b::BBox{T}) where T
 
 Get the coordinates of a bounding volume's centre, as a NTuple{3, T}.
+
 """
 function center end
 
@@ -407,4 +461,76 @@ end
 
 function iscontact(a::BBox, b::BSphere)
     iscontact(b, a)
+end
+
+
+@inline function isintersection(b::BBox, p::AbstractVector, d::AbstractVector)
+
+    @boundscheck begin
+        @assert length(p) == 3
+        @assert length(d) == 3
+    end
+
+    T = eltype(d)
+
+    @inbounds begin
+        inv_d = (one(T) / d[1], one(T) / d[2], one(T) / d[3])
+
+        # Set x bounds
+        t_bound_x1 = (b.lo[1] - p[1]) * inv_d[1]
+        t_bound_x2 = (b.up[1] - p[1]) * inv_d[1]
+
+        tmin = minimum2(t_bound_x1, t_bound_x2)
+        tmax = maximum2(t_bound_x1, t_bound_x2)
+
+        # Set y bounds
+        t_bound_y1 = (b.lo[2] - p[2]) * inv_d[2]
+        t_bound_y2 = (b.up[2] - p[2]) * inv_d[2]
+
+        tmin = maximum2(tmin, minimum2(t_bound_y1, t_bound_y2))
+        tmax = minimum2(tmax, maximum2(t_bound_y1, t_bound_y2))
+
+        # Set z bounds
+        t_bound_z1 = (b.lo[3] - p[3]) * inv_d[3]
+        t_bound_z2 = (b.up[3] - p[3]) * inv_d[3]
+
+        tmin = maximum2(tmin, minimum2(t_bound_z1, t_bound_z2))
+        tmax = minimum2(tmax, maximum2(t_bound_z1, t_bound_z2))
+    end
+        
+    # If condition satisfied ray intersects box. tmax >= 0 
+    # ensure only forwards intersections are counted
+    (tmin <= tmax) && (tmax >= 0)
+end
+
+
+@inline function isintersection(s::BSphere, p::AbstractVector, d::AbstractVector)
+
+    @boundscheck begin
+        @assert length(p) == 3
+        @assert length(d) == 3
+    end
+
+    @inbounds begin
+        a = dot3(d, d)
+        b = 2 * (
+            (p[1] - s.x[1]) * d[1] +
+            (p[2] - s.x[2]) * d[2] +
+            (p[3] - s.x[3]) * d[3]
+        )
+        c = (
+            (p[1] - s.x[1]) * (p[1] - s.x[1]) +
+            (p[2] - s.x[2]) * (p[2] - s.x[2]) +
+            (p[3] - s.x[3]) * (p[3] - s.x[3])
+        ) - s.r * s.r
+    end
+
+    discriminant = b * b - 4 * a * c
+
+    if discriminant >= 0
+        # Ensure only forwards intersections are counted
+        return 0 >= b * c
+    else
+        return false
+    end    
 end
