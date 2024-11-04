@@ -9,6 +9,7 @@ ImplicitBVH.BSphere
 
 ```@docs
 ImplicitBVH.iscontact
+ImplicitBVH.isintersection
 ImplicitBVH.center
 ```
 

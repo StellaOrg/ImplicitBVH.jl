@@ -40,10 +40,7 @@ for (ibv, iray) in bvt.contacts
 end
 
 
-# TODO Brute force tests for comparison
-# TODO document rays and integrate them in bounding_volumes.jl
 # TODO add example to README
-# TODO include in docs/
 # TODO maybe a pretty image / render?
 # TODO benchmark against a standard raytracer? Check Chitalu's paper; the Stanford bunny example
 

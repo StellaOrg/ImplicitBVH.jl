@@ -23,11 +23,10 @@ using GPUArraysCore: AbstractGPUVector, @allowscalar
 import AcceleratedKernels as AK
 
 
-# Include code from other files
 include("utils.jl")
 include("morton.jl")
 include("implicit_tree.jl")
-include("bounding_volumes.jl")
+include("bounding_volumes/bounding_volumes.jl")
 include("build.jl")
 include("traverse/traverse.jl")
 include("raytrace/raytrace.jl")
