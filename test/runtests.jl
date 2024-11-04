@@ -238,6 +238,118 @@ end
 end
 
 
+@testset "ray-box isintersection" begin
+
+    using ImplicitBVH: isintersection
+
+    # Below box and ray going through corner
+    box = BBox((0., 0., 0.), (1., 1., 1.))
+    point = [-1., -1., -1.]
+    direction = [1., 1., 1.]
+    @test isintersection(box, point, direction) == true
+
+    # Below box and ray going through corner ray direction flipped case
+    box = BBox((0., 0., 0.), (1., 1., 1.))
+    point = [-1., -1., -1.]
+    direction = [-1., -1., -1.]
+    @test isintersection(box, point, direction) == false
+
+    # Below box ray going up and through face
+    box = BBox((0., 0., 0.), (1., 1., 1.))
+    point = [-1., -.5, 0.]
+    direction = [5., 3., 1.5]
+    @test isintersection(box, point, direction) == true
+
+    # Below box ray going up and through face
+    box = BBox((0., 0., 0.), (1., 1., 1.))
+    point = [0.5, -0.5, 0.5]
+    direction = [0., 1., 0.]
+    @test isintersection(box, point, direction) == true
+
+    # Below box ray going up and through face ray direction flipped case
+    box = BBox((0., 0., 0.), (1., 1., 1.))
+    point = [-1., -.5, 0.]
+    direction = [-5., -3., -1.5]
+    @test isintersection(box, point, direction) == false
+
+    # Inside box going through upper corner case 
+    box = BBox((0., 0., 0.), (1., 1., 1.))
+    point = [.5, .5, .5]
+    direction = [1., 1., 1.]
+    @test isintersection(box, point, direction) == true
+
+    # Inside box going through bottom corner (direction flipped case)
+    box = BBox((0., 0., 0.), (1., 1., 1.))
+    point = [.5, .5, .5]
+    direction = [-1., -1., -1.]
+    @test isintersection(box, point, direction) == true
+
+    # Inside box going along face surface
+    box = BBox((0., 0., 0.), (1., 1., 1.))
+    point = [1e-8, 0, 0.5]
+    direction = [0, 1., 0]
+    @test isintersection(box, point, direction) == true
+
+    # Outside box going along edge
+    box = BBox((0., 0., 0.), (1., 1., 1.))
+    point = [1e-8, -1., 1e-8]
+    direction = [0, 1., 0]
+    @test isintersection(box, point, direction) == true
+end
+
+
+@testset "ray-sphere isintersection" begin
+
+    # ray above sphere passing down and through
+    sphere = BSphere((0., 0., 0.), 0.5)
+    point = [.5, .5, .5]
+    direction = [-1., -1., -1.]
+    @test isintersection(sphere, point, direction) == true
+
+    # ray above sphere passing up and not intersecting direction flipped
+    sphere = BSphere((0., 0., 0.), 0.5)
+    point = [.5, .5, .5]
+    direction = [1., 1., 1.]
+    @test isintersection(sphere, point, direction) == false
+
+    # ray below sphere passing up and intersecting
+    sphere = BSphere((0., 0., 0.), 0.5)
+    point = [0., 0., -1.]
+    direction = [0., 0., 1.]
+    @test isintersection(sphere, point, direction) == true
+
+    # ray below sphere passing and not intersecting
+    sphere = BSphere((0., 0., 0.), 0.5)
+    point = [0., 0., -1.]
+    direction = [0., 0., -1.]
+    @test isintersection(sphere, point, direction) == false
+
+    # ray below sphere passing up and tangent to sphere
+    sphere = BSphere((0., 0., 0.), 0.5)
+    point = [0., 0.5, -1.]
+    direction = [0., 0., 1.]
+    @test isintersection(sphere, point, direction) == true
+
+    # ray to the side of sphere and passing tangent to sphere
+    sphere = BSphere((0., 0., 0.), 0.5)
+    point = [0., -1, 0.5]
+    direction = [0., 1., 0.]
+    @test isintersection(sphere, point, direction) == true
+
+    # ray inside sphere passing up and out
+    sphere = BSphere((0., 0., 0.), 0.5)
+    point = [0., 0., 0.]
+    direction = [0., 0., 1.]
+    @test isintersection(sphere, point, direction) == true
+
+    # ray inside sphere passing down and out flipped direction
+    sphere = BSphere((0., 0., 0.), 0.5)
+    point = [0., 0., 0.]
+    direction = [0., 0., -1.]
+    @test isintersection(sphere, point, direction) == true
+
+end
+
 
 
 @testset "test_morton" begin

@@ -26,6 +26,8 @@ detection downwards from this level.
 
 ## Examples
 
+### Multithreaded Contact Detection
+
 Simple usage with bounding spheres and default 64-bit types:
 
 ```julia
@@ -130,7 +132,7 @@ traversal = traverse(
 Check out the `benchmark` folder for an example traversing an STL model.
 
 
-# GPU Bounding Volume Hierarchy Building and Traversal
+### GPU-Accelerated Contact Detection
 
 Simply use a GPU array for the bounding volumes; the interface remains the same, and all operations - Morton encoding, sorting, BVH building and traversal for contact finding - will run on the right backend:
 
@@ -156,6 +158,51 @@ bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
 # Traverse BVH for contact detection
 traversal = traverse(bvh)
 ```
+
+
+### Multithreaded Ray Tracing
+
+Using `BSphere{Float32}` for leaves, `BBox{Float32}` for merged nodes above, and `UInt32` Morton codes:
+
+```julia
+using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
+
+# Load mesh and compute bounding spheres for each triangle. Can download mesh from:
+# https://github.com/alecjacobson/common-3d-test-models/blob/master/data/xyzrgb_dragon.obj
+using MeshIO
+using FileIO
+
+mesh = load("xyzrgb_dragon.obj")
+
+# Generate bounding spheres around each triangle in the mesh
+bounding_spheres = [BSphere{Float32}(tri) for tri in mesh]
+
+# Build BVH
+bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
+
+# Generate some rays
+points = rand(Float32, 3, 1000)
+directions = rand(Float32, 3, 1000)
+
+# Traverse BVH to get indices of rays intersecting the bounding spheres
+traversal = traverse_rays(bvh, points, directions)
+@show traversal.contacts
+
+# output
+traversal.contacts = Tuple{Int32, Int32}[...]
+```
+
+The bounding spheres around each triangle can be computed in parallel (including on GPUs) using [AcceleratedKernels.jl](https://github.com/anicusan/AcceleratedKernels.jl):
+
+```julia
+import AcceleratedKernels as AK
+
+bounding_spheres = Vector{BSphere{Float32}}(undef, length(mesh))
+AK.map!(BSphere{Float32}, bounding_spheres, mesh)
+```
+
+For GPUs simply swap `Vector` with `ROCVector`, `MtlVector`, `oneVector` or `CuVector`, and AcceleratedKernels will automatically run the code on the right GPU backend (from `AMDGPU`, `Metal`, `oneAPI`, `CUDA`).
 
 
 # Implicit Bounding Volume Hierarchy
