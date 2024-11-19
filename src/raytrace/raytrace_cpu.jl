@@ -7,7 +7,7 @@ function traverse_rays_nodes!(bvh, points, directions, src, dst, num_src, ::Noth
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
-    tp = TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
+    tp = AK.TaskPartitioner(num_src, options.num_threads, options.min_traversals_per_thread)
     if tp.num_tasks == 1
         num_dst = traverse_rays_nodes_range!(
             bvh, points, directions,
