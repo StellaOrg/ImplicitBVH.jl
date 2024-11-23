@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>ImplicitBVH.jl Documentation · ImplicitBVH.jl</title><meta name="title" content="ImplicitBVH.jl Documentation · ImplicitBVH.jl"/><meta property="og:title" content="ImplicitBVH.jl Documentation · ImplicitBVH.jl"/><meta property="twitter:title" content="ImplicitBVH.jl Documentation · ImplicitBVH.jl"/><meta name="description" content="Documentation for ImplicitBVH.jl."/><meta property="og:description" content="Documentation for ImplicitBVH.jl."/><meta property="twitter:description" content="Documentation for ImplicitBVH.jl."/><script data-outdated-warner src="assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="search_index.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href><img src="assets/logo.png" alt="ImplicitBVH.jl logo"/></a><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li class="is-active"><a class="tocitem" href>ImplicitBVH.jl Documentation</a><ul class="internal"><li><a class="tocitem" href="#BVH-Construction-and-Traversal"><span>BVH Construction &amp; Traversal</span></a></li><li><a class="tocitem" href="#Index"><span>Index</span></a></li></ul></li><li><a class="tocitem" href="bounding_volumes/">Bounding Volumes</a></li><li><a class="tocitem" href="implicit_tree/">Implicit Binary Tree</a></li><li><a class="tocitem" href="morton/">Morton Encoding</a></li><li><a class="tocitem" href="utilities/">Utilities</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>ImplicitBVH.jl Documentation</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>ImplicitBVH.jl Documentation</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/StellaOrg/ImplicitBVH.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/StellaOrg/ImplicitBVH.jl/blob/main/docs/src/index.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="ImplicitBVH.jl-Documentation"><a class="docs-heading-anchor" href="#ImplicitBVH.jl-Documentation">ImplicitBVH.jl Documentation</a><a id="ImplicitBVH.jl-Documentation-1"></a><a class="docs-heading-anchor-permalink" href="#ImplicitBVH.jl-Documentation" title="Permalink"></a></h1><h2 id="BVH-Construction-and-Traversal"><a class="docs-heading-anchor" href="#BVH-Construction-and-Traversal">BVH Construction &amp; Traversal</a><a id="BVH-Construction-and-Traversal-1"></a><a class="docs-heading-anchor-permalink" href="#BVH-Construction-and-Traversal" title="Permalink"></a></h2><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="ImplicitBVH.BVH" href="#ImplicitBVH.BVH"><code>ImplicitBVH.BVH</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">struct BVH{I&lt;:Integer, VN&lt;:(AbstractVector), VL&lt;:(AbstractVector), VM&lt;:(AbstractVector), VO&lt;:(AbstractVector)}</code></pre><p>Implicit bounding volume hierarchy constructed from an iterable of some geometric primitives&#39; (e.g. triangles in a mesh) bounding volumes forming the <a href="implicit_tree/#ImplicitBVH.ImplicitTree"><code>ImplicitTree</code></a> leaves. The leaves and merged nodes above them can have different types - e.g. <code>BSphere{Float64}</code> for leaves merged into larger <code>BBox{Float64}</code>.</p><p>The initial geometric primitives are sorted according to their Morton-encoded coordinates; the unsigned integer type used for the Morton encoding can be chosen between <code>Union{UInt16, UInt32, UInt64}</code>.</p><p>Finally, the tree can be incompletely-built up to a given <code>built_level</code> and later start contact detection downwards from this level, e.g.:</p><pre><code class="nohighlight hljs">Implicit tree from 5 bounding volumes - i.e. the real leaves
+
+Tree Level          Nodes &amp; Leaves               Build Up    Traverse Down
+    1                     1                         Ʌ              |
+    2             2               3                 |              |
+    3         4       5       6        7v           |              |
+    4       8   9   10 11   12 13v  14v  15v        |              V
+            -------Real------- ---Virtual---</code></pre><p><strong>Methods</strong></p><pre><code class="nohighlight hljs"># Normal constructor which builds BVH
+BVH(
+    bounding_volumes::AbstractVector{L},
+    node_type::Type{N}=L,
+    morton_type::Type{U}=UInt32,
+    built_level=1,
+    cache::Union{Nothing, BVH}=nothing;
+    options=BVHOptions(),
+) where {L, N, U &lt;: MortonUnsigned}</code></pre><p><strong>Fields</strong></p><ul><li><code>tree::</code><a href="implicit_tree/#ImplicitBVH.ImplicitTree"><code>ImplicitTree</code></a><code>{I &lt;: Integer}</code></li><li><code>nodes::VN &lt;: AbstractVector</code></li><li><code>leaves::VL &lt;: AbstractVector</code></li><li><code>mortons::VM &lt;: AbstractVector</code></li><li><code>order::VO &lt;: AbstractVector</code></li><li><code>built_level::Int</code></li></ul><p><strong>Examples</strong></p><p>Simple usage with bounding spheres and default 64-bit types:</p><pre><code class="language-julia hljs">using ImplicitBVH
+using ImplicitBVH: BSphere
+
+# Generate some simple bounding spheres
+bounding_spheres = [
+    BSphere([0., 0., 0.], 0.5),
+    BSphere([0., 0., 1.], 0.6),
+    BSphere([0., 0., 2.], 0.5),
+    BSphere([0., 0., 3.], 0.4),
+    BSphere([0., 0., 4.], 0.6),
+]
+
+# Build BVH
+bvh = BVH(bounding_spheres)
+
+# Traverse BVH for contact detection
+traversal = traverse(bvh)
+@show traversal.contacts;
+;
+
+# output
+traversal.contacts = Tuple{Int32, Int32}[(1, 2), (2, 3), (4, 5)]</code></pre><p>Using <code>Float32</code> bounding spheres for leaves, <code>Float32</code> bounding boxes for nodes above, and <code>UInt32</code> Morton codes:</p><pre><code class="language-julia hljs">using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
+
+# Generate some simple bounding spheres
+bounding_spheres = [
+    BSphere{Float32}([0., 0., 0.], 0.5),
+    BSphere{Float32}([0., 0., 1.], 0.6),
+    BSphere{Float32}([0., 0., 2.], 0.5),
+    BSphere{Float32}([0., 0., 3.], 0.4),
+    BSphere{Float32}([0., 0., 4.], 0.6),
+]
+
+# Build BVH
+bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
+
+# Traverse BVH for contact detection
+traversal = traverse(bvh)
+@show traversal.contacts;
+;
+
+# output
+traversal.contacts = Tuple{Int32, Int32}[(1, 2), (2, 3), (4, 5)]</code></pre><p>Build BVH up to level 2 and start traversing down from level 3, reusing the previous traversal cache:</p><pre><code class="language-julia hljs">bvh = BVH(bounding_spheres, BBox{Float32}, UInt32, 2)
+traversal = traverse(bvh, 3, traversal)</code></pre><p>Reuse previous BVH memory for a new BVH (specifically, the nodes, mortons, and order vectors, but not the leaves):</p><pre><code class="language-julia hljs">bvh = BVH(bounding_spheres, BBox{Float32}, UInt32, 1, bvh)</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/StellaOrg/ImplicitBVH.jl/blob/22e1a035640e9183f31e2b31b7e9936a06068294/src/build.jl#L1-L117">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="ImplicitBVH.traverse" href="#ImplicitBVH.traverse"><code>ImplicitBVH.traverse</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">traverse(
+    bvh::BVH,
+    start_level::Int=default_start_level(bvh),
+    cache::Union{Nothing, BVHTraversal}=nothing;
+    options=BVHOptions(),
+)::BVHTraversal</code></pre><p>Traverse <code>bvh</code> downwards from <code>start_level</code>, returning all contacting bounding volume leaves. The returned <a href="#ImplicitBVH.BVHTraversal"><code>BVHTraversal</code></a> also contains two contact buffers that can be reused on future traversals.</p><p><strong>Examples</strong></p><pre><code class="language-julia hljs">using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
+
+# Generate some simple bounding spheres
+bounding_spheres = [
+    BSphere{Float32}([0., 0., 0.], 0.5),
+    BSphere{Float32}([0., 0., 1.], 0.6),
+    BSphere{Float32}([0., 0., 2.], 0.5),
+    BSphere{Float32}([0., 0., 3.], 0.4),
+    BSphere{Float32}([0., 0., 4.], 0.6),
+]
+
+# Build BVH
+bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
+
+# Traverse BVH for contact detection
+traversal = traverse(bvh, 2)
+
+# Reuse traversal buffers for future contact detection - possibly with different BVHs
+traversal = traverse(bvh, 2, traversal)
+@show traversal.contacts;
+;
+
+# output
+traversal.contacts = Tuple{Int32, Int32}[(1, 2), (2, 3), (4, 5)]</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/StellaOrg/ImplicitBVH.jl/blob/22e1a035640e9183f31e2b31b7e9936a06068294/src/traverse/traverse_single.jl#L1-L42">source</a></section><section><div><pre><code class="language-julia hljs">traverse(
+    bvh1::BVH,
+    bvh2::BVH,
+    start_level1::Int=default_start_level(bvh1),
+    start_level2::Int=default_start_level(bvh2),
+    cache::Union{Nothing, BVHTraversal}=nothing;
+    options=BVHOptions(),
+)::BVHTraversal</code></pre><p>Return all the <code>bvh1</code> bounding volume leaves that are in contact with any in <code>bvh2</code>. The returned <a href="#ImplicitBVH.BVHTraversal"><code>BVHTraversal</code></a> also contains two contact buffers that can be reused on future traversals.</p><p><strong>Examples</strong></p><pre><code class="language-julia hljs">using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
+
+# Generate some simple bounding spheres
+bounding_spheres1 = [
+    BSphere{Float32}([0., 0., 0.], 0.5),
+    BSphere{Float32}([0., 0., 3.], 0.4),
+]
+
+bounding_spheres2 = [
+    BSphere{Float32}([0., 0., 1.], 0.6),
+    BSphere{Float32}([0., 0., 2.], 0.5),
+    BSphere{Float32}([0., 0., 4.], 0.6),
+]
+
+# Build BVHs
+bvh1 = BVH(bounding_spheres1, BBox{Float32}, UInt32)
+bvh2 = BVH(bounding_spheres2, BBox{Float32}, UInt32)
+
+# Traverse BVH for contact detection
+traversal = traverse(bvh1, bvh2, default_start_level(bvh1), default_start_level(bvh2))
+
+# Reuse traversal buffers for future contact detection - possibly with different BVHs
+traversal = traverse(bvh1, bvh2, default_start_level(bvh1), default_start_level(bvh2), traversal)
+@show traversal.contacts;
+;
+
+# output
+traversal.contacts = Tuple{Int32, Int32}[(1, 1), (2, 3)]</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/StellaOrg/ImplicitBVH.jl/blob/22e1a035640e9183f31e2b31b7e9936a06068294/src/traverse/traverse_pair.jl#L1-L47">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="ImplicitBVH.traverse_rays" href="#ImplicitBVH.traverse_rays"><code>ImplicitBVH.traverse_rays</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">traverse_rays(
+    bvh::BVH,
+    points::AbstractArray,
+    directions::AbstractArray,
+    start_level::Int=1,
+    cache::Union{Nothing, BVHTraversal}=nothing;
+    options=BVHOptions(),
+)::BVHTraversal</code></pre><p>Compute the intersections between a set of N rays defined by <code>points</code> (shape <code>(3, N)</code>) and <code>directions</code> (shape, <code>(3, N)</code>), and some bounding volumes inside a <code>bvh</code>.</p><p>Only forward rays are counted - i.e. the direction matters.</p><p>The returned <a href="#ImplicitBVH.BVHTraversal"><code>BVHTraversal</code></a> <code>.contacts</code> field will contain the index pairs <code>(iboundingvolume, iray)</code> following the order in <code>bvh.leaves</code> and <code>axes(points, 2)</code>.</p><p><strong>Examples</strong></p><pre><code class="language-julia hljs">using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
+
+# Generate some simple bounding spheres
+bounding_spheres = [
+    BSphere{Float32}([0., 0., 0.], 0.5),
+    BSphere{Float32}([0., 0., 1.], 0.6),
+    BSphere{Float32}([0., 0., 2.], 0.5),
+    BSphere{Float32}([0., 0., 3.], 0.4),
+    BSphere{Float32}([0., 0., 4.], 0.6),
+]
+
+# Generate two rays, each defined by a point source and direction
+points = [
+    0.  0 
+    0.  0
+    -1 -1
+]
+
+# One ray passes through all bounding volumes, the other goes downwards and does not
+directions = [
+    0.  0
+    0.  0
+    1.  -1
+]
+
+# Build BVH
+bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
+
+# Traverse BVH for contact detection
+traversal = traverse_rays(bvh, points, directions)
+
+# Reuse traversal buffers for future contact detection - possibly with different BVHs
+traversal = traverse_rays(bvh, points, directions, 2, traversal)
+@show traversal.contacts;
+;
+
+# output
+traversal.contacts = Tuple{Int32, Int32}[(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)]</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/StellaOrg/ImplicitBVH.jl/blob/22e1a035640e9183f31e2b31b7e9936a06068294/src/raytrace/raytrace.jl#L1-L62">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="ImplicitBVH.BVHTraversal" href="#ImplicitBVH.BVHTraversal"><code>ImplicitBVH.BVHTraversal</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">struct BVHTraversal{C1&lt;:(AbstractVector), C2&lt;:(AbstractVector)}</code></pre><p>Collected BVH traversal <code>contacts</code> vector, some stats, plus the two buffers <code>cache1</code> and <code>cache2</code> which can be reused for future traversals to minimise memory allocations.</p><p><strong>Fields</strong></p><ul><li><code>start_level1::Int</code>: the level at which the single/pair-tree traversal started for the first BVH.</li><li><code>start_level2::Int</code>: the level at which the pair-tree traversal started for the second BVH.</li><li><code>num_checks::Int</code>: the total number of contact checks done.</li><li><code>num_contacts::Int</code>: the number of contacts found.</li><li><code>contacts::view(cache1, 1:num_contacts)</code>: the contacting pairs found, as a view into <code>cache1</code>.</li><li><code>cache1::C1{IndexPair} &lt;: AbstractVector</code>: first BVH traversal buffer.</li><li><code>cache2::C2{IndexPair} &lt;: AbstractVector</code>: second BVH traversal buffer.</li></ul></div><a class="docs-sourcelink" target="_blank" href="https://github.com/StellaOrg/ImplicitBVH.jl/blob/22e1a035640e9183f31e2b31b7e9936a06068294/src/traverse/traverse.jl#L9-L23">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="ImplicitBVH.default_start_level" href="#ImplicitBVH.default_start_level"><code>ImplicitBVH.default_start_level</code></a> — <span class="docstring-category">Function</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">default_start_level(bvh::BVH)::Int
+default_start_level(num_leaves::Integer)::Int</code></pre><p>Compute the default start level when traversing a single BVH tree.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/StellaOrg/ImplicitBVH.jl/blob/22e1a035640e9183f31e2b31b7e9936a06068294/src/traverse/traverse.jl#L80-L85">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="ImplicitBVH.IndexPair" href="#ImplicitBVH.IndexPair"><code>ImplicitBVH.IndexPair</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">const IndexPair{I} = Tuple{I, I}</code></pre><p>Alias for a tuple of two indices representing e.g. a contacting pair.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/StellaOrg/ImplicitBVH.jl/blob/22e1a035640e9183f31e2b31b7e9936a06068294/src/traverse/traverse.jl#L1-L5">source</a></section></article><h2 id="Index"><a class="docs-heading-anchor" href="#Index">Index</a><a id="Index-1"></a><a class="docs-heading-anchor-permalink" href="#Index" title="Permalink"></a></h2><ul><li><a href="bounding_volumes/#ImplicitBVH.BBox"><code>ImplicitBVH.BBox</code></a></li><li><a href="bounding_volumes/#ImplicitBVH.BSphere"><code>ImplicitBVH.BSphere</code></a></li><li><a href="#ImplicitBVH.BVH"><code>ImplicitBVH.BVH</code></a></li><li><a href="utilities/#ImplicitBVH.BVHOptions"><code>ImplicitBVH.BVHOptions</code></a></li><li><a href="#ImplicitBVH.BVHTraversal"><code>ImplicitBVH.BVHTraversal</code></a></li><li><a href="implicit_tree/#ImplicitBVH.ImplicitTree"><code>ImplicitBVH.ImplicitTree</code></a></li><li><a href="#ImplicitBVH.IndexPair"><code>ImplicitBVH.IndexPair</code></a></li><li><a href="morton/#ImplicitBVH.MortonUnsigned"><code>ImplicitBVH.MortonUnsigned</code></a></li><li><a href="morton/#ImplicitBVH.bounding_volumes_extrema"><code>ImplicitBVH.bounding_volumes_extrema</code></a></li><li><a href="bounding_volumes/#ImplicitBVH.center"><code>ImplicitBVH.center</code></a></li><li><a href="#ImplicitBVH.default_start_level"><code>ImplicitBVH.default_start_level</code></a></li><li><a href="utilities/#ImplicitBVH.get_index_type"><code>ImplicitBVH.get_index_type</code></a></li><li><a href="bounding_volumes/#ImplicitBVH.iscontact"><code>ImplicitBVH.iscontact</code></a></li><li><a href="bounding_volumes/#ImplicitBVH.isintersection"><code>ImplicitBVH.isintersection</code></a></li><li><a href="implicit_tree/#ImplicitBVH.isvirtual"><code>ImplicitBVH.isvirtual</code></a></li><li><a href="implicit_tree/#ImplicitBVH.level_indices"><code>ImplicitBVH.level_indices</code></a></li><li><a href="implicit_tree/#ImplicitBVH.memory_index"><code>ImplicitBVH.memory_index</code></a></li><li><a href="morton/#ImplicitBVH.morton_encode"><code>ImplicitBVH.morton_encode</code></a></li><li><a href="morton/#ImplicitBVH.morton_encode!"><code>ImplicitBVH.morton_encode!</code></a></li><li><a href="morton/#ImplicitBVH.morton_encode_single"><code>ImplicitBVH.morton_encode_single</code></a></li><li><a href="morton/#ImplicitBVH.morton_scaling"><code>ImplicitBVH.morton_scaling</code></a></li><li><a href="morton/#ImplicitBVH.morton_split3"><code>ImplicitBVH.morton_split3</code></a></li><li><a href="morton/#ImplicitBVH.relative_precision"><code>ImplicitBVH.relative_precision</code></a></li><li><a href="#ImplicitBVH.traverse"><code>ImplicitBVH.traverse</code></a></li><li><a href="#ImplicitBVH.traverse_rays"><code>ImplicitBVH.traverse_rays</code></a></li></ul></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="bounding_volumes/">Bounding Volumes »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Saturday 23 November 2024 23:25">Saturday 23 November 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
