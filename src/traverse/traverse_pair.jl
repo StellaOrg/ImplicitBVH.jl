@@ -88,7 +88,7 @@ function traverse(
     extra = if bvtt1 isa AbstractGPUVector
         # For GPUs we need an additional global offset to coordinate writing results
         backend = get_backend(bvtt1)
-        KernelAbstractions.zeros(backend, index_type, bvh.tree.levels)
+        KernelAbstractions.zeros(backend, index_type, bvh1.tree.levels * bvh2.tree.levels)
     else
         # For CPUs we need a vector of spawned tasks and a contact counter for each task
         tasks = Vector{Task}(undef, options.num_threads)
@@ -197,7 +197,7 @@ function traverse(
     num_bvtt = traverse_leaves_pair!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra, options)
 
     # Return contact list and the other buffer as possible cache
-    BVHTraversal(start_level1, start_level2, num_checks, num_bvtt, bvtt2, bvtt1)
+    BVHTraversal(start_level1, start_level2, num_checks, Int(num_bvtt), bvtt2, bvtt1)
 end
 
 

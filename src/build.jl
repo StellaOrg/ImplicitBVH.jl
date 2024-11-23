@@ -191,11 +191,7 @@ function BVH(
 
     # Compute indices that sort codes along the Z-curve - closer objects have closer Morton codes
     order = similar(mortons, I)
-    if mortons isa AbstractGPUVector
-        AK.sortperm!(order, mortons, block_size=options.block_size)
-    else
-        sortperm!(order, mortons)
-    end
+    AK.sortperm!(order, mortons, block_size=options.block_size)
 
     # Pre-allocate vector of bounding volumes for the real nodes above the bottom level
     bvh_nodes = similar(bounding_volumes, N, Int(tree.real_nodes - tree.real_leaves))
@@ -319,6 +315,53 @@ function aggregate_oibvh!(bvh_nodes, bvh_leaves, tree, order, built_level, optio
 end
 
 
+@inline function aggregate_last_level!(bvh_nodes, bvh_leaves, tree, order, options)
+
+    # Make sure types in the core kernel (which will be executed on CPU and GPU) are coherent;
+    # important, as GPUs are 32-bit machines
+    I = get_index_type(options)
+
+    # Memory index of first node on this level (i.e. first above leaf-level)
+    level = tree.levels - 0x1
+    start_pos::I = memory_index(tree, pow2(level - 0x1))
+
+    # Number of real nodes on this level
+    num_nodes::I = pow2(level - 0x1) - tree.virtual_leaves >> (tree.levels - level)
+
+    # Merge all pairs of children below this level
+    num_nodes_next::I = pow2(level) - tree.virtual_leaves >> (tree.levels - (level + 0x1))
+
+    # Multithreaded CPU / GPU implementation
+    aggregate_last_level_kernel!(
+        0x1:num_nodes, get_backend(bvh_nodes), options,
+        bvh_nodes, bvh_leaves, order,
+        start_pos, num_nodes_next,
+    )
+
+    nothing
+end
+
+
+function aggregate_last_level_kernel!(
+    irange, backend, options,
+    bvh_nodes, bvh_leaves, order,
+    start_pos, num_nodes_next,
+)
+    AK.foreachindex(
+        irange, backend,
+        block_size=options.block_size,
+        scheduler=options.scheduler,
+        max_tasks=options.num_threads,
+        min_elems=options.min_boundings_per_thread,
+    ) do i
+        _aggregate_last_level_at!(
+            bvh_nodes, bvh_leaves, order,
+            start_pos, num_nodes_next, i,
+        )
+    end
+end
+
+
 @inline @inbounds function _aggregate_last_level_at!(
     bvh_nodes,
     bvh_leaves,
@@ -327,11 +370,8 @@ end
     num_nodes_next,
     i,
 )
-    # Index type
-    I = typeof(i)
-
-    lchild_implicit = I(2) * i - I(1)
-    rchild_implicit = I(2) * i
+    lchild_implicit = 0x2 * i - 0x1
+    rchild_implicit = 0x2 * i
 
     rchild_virtual = rchild_implicit > num_nodes_next
 
@@ -346,76 +386,17 @@ end
     if eltype(bvh_nodes) === eltype(bvh_leaves)
         # If right child is virtual, set the parent BV to the left child one; otherwise merge
         if rchild_virtual
-            bvh_nodes[start_pos - I(1) + i] = bvh_leaves[lchild_index]
+            bvh_nodes[start_pos - 0x1 + i] = bvh_leaves[lchild_index]
         else
-            bvh_nodes[start_pos - I(1) + i] = bvh_leaves[lchild_index] + bvh_leaves[rchild_index]
+            bvh_nodes[start_pos - 0x1 + i] = bvh_leaves[lchild_index] + bvh_leaves[rchild_index]
         end
     else
         if rchild_virtual
-            bvh_nodes[start_pos - I(1) + i] = eltype(bvh_nodes)(bvh_leaves[lchild_index])
+            bvh_nodes[start_pos - 0x1 + i] = eltype(bvh_nodes)(bvh_leaves[lchild_index])
         else
-            bvh_nodes[start_pos - I(1) + i] = eltype(bvh_nodes)(bvh_leaves[lchild_index],
-                                                                bvh_leaves[rchild_index])
+            bvh_nodes[start_pos - 0x1 + i] = eltype(bvh_nodes)(bvh_leaves[lchild_index],
+                                                               bvh_leaves[rchild_index])
         end
-    end
-
-    nothing
-end
-
-
-@inline function aggregate_last_level!(bvh_nodes, bvh_leaves, tree, order, options)
-
-    # Make sure types in the core kernel (which will be executed on CPU and GPU) are coherent;
-    # important, as GPUs are 32-bit machines
-    I = get_index_type(options)
-
-    # Memory index of first node on this level (i.e. first above leaf-level)
-    level = tree.levels - 1
-    start_pos::I = memory_index(tree, pow2(level - 1))
-
-    # Number of real nodes on this level
-    num_nodes::I = pow2(level - I(1)) - tree.virtual_leaves >> (tree.levels - level)
-
-    # Merge all pairs of children below this level
-    num_nodes_next::I = pow2(level) - tree.virtual_leaves >> (tree.levels - (level + I(1)))
-
-    # Multithreaded CPU / GPU implementation
-    AK.foreachindex(
-        I(1):num_nodes, get_backend(bvh_nodes),
-        block_size=options.block_size,
-        scheduler=options.scheduler,
-        max_tasks=options.num_threads,
-        min_elems=options.min_boundings_per_thread,
-    ) do i
-        _aggregate_last_level_at!(
-            bvh_nodes, bvh_leaves, order,
-            start_pos, num_nodes_next, i,
-        )
-    end
-
-    nothing
-end
-
-
-@inline @inbounds function _aggregate_level_at!(
-    bvh_nodes,
-    start_pos,
-    start_pos_next,
-    num_nodes_next,
-    i,
-)
-    # Index type
-    I = typeof(i)
-
-    lchild_index = start_pos_next + I(2) * i - I(2)
-    rchild_index = start_pos_next + I(2) * i - I(1)
-
-    if rchild_index > start_pos_next + num_nodes_next - I(1)
-        # If right child is virtual, set the parent BV to the child one
-        bvh_nodes[start_pos - I(1) + i] = bvh_nodes[lchild_index]
-    else
-        # Merge children bounding volumes
-        bvh_nodes[start_pos - I(1) + i] = bvh_nodes[lchild_index] + bvh_nodes[rchild_index]
     end
 
     nothing
@@ -429,26 +410,60 @@ end
     I = get_index_type(options)
 
     # Memory index of first node on this level
-    start_pos::I = memory_index(tree, pow2(level - 1))
+    start_pos::I = memory_index(tree, pow2(level - 0x1))
 
     # Number of real nodes on this level
-    num_nodes::I = pow2(level - 1) - tree.virtual_leaves >> (tree.levels - level)
+    num_nodes::I = pow2(level - 0x1) - tree.virtual_leaves >> (tree.levels - level)
 
     # Merge all pairs of children below this level
     start_pos_next::I = memory_index(tree, pow2(level))
-    num_nodes_next::I = pow2(level) - tree.virtual_leaves >> (tree.levels - (level + 1))
+    num_nodes_next::I = pow2(level) - tree.virtual_leaves >> (tree.levels - (level + 0x1))
 
     # Multithreaded CPU / GPU implementation
+    aggregate_level_kernel!(
+        0x1:num_nodes, get_backend(bvh_nodes), options,
+        bvh_nodes,
+        start_pos, start_pos_next, num_nodes_next,
+    )
+
+    nothing
+end
+
+
+function aggregate_level_kernel!(
+    irange, backend, options,
+    bvh_nodes,
+    start_pos, start_pos_next, num_nodes_next,
+)
     AK.foreachindex(
-        I(1):num_nodes, get_backend(bvh_nodes),
+        irange, backend,
         block_size=options.block_size,
         scheduler=options.scheduler,
         max_tasks=options.num_threads,
         min_elems=options.min_boundings_per_thread,
     ) do i
         _aggregate_level_at!(bvh_nodes, start_pos, start_pos_next, num_nodes_next, i)
+    end    
+end
+
+
+@inline @inbounds function _aggregate_level_at!(
+    bvh_nodes,
+    start_pos,
+    start_pos_next,
+    num_nodes_next,
+    i,
+)
+    lchild_index = start_pos_next + 0x2 * i - 0x2
+    rchild_index = start_pos_next + 0x2 * i - 0x1
+
+    if rchild_index > start_pos_next + num_nodes_next - 0x1
+        # If right child is virtual, set the parent BV to the child one
+        bvh_nodes[start_pos - 0x1 + i] = bvh_nodes[lchild_index]
+    else
+        # Merge children bounding volumes
+        bvh_nodes[start_pos - 0x1 + i] = bvh_nodes[lchild_index] + bvh_nodes[rchild_index]
     end
 
     nothing
 end
-

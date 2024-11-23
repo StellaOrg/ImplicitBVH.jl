@@ -9,7 +9,7 @@
 Traverse `bvh` downwards from `start_level`, returning all contacting bounding volume leaves. The
 returned [`BVHTraversal`](@ref) also contains two contact buffers that can be reused on future
 traversals.
-    
+
 # Examples
 
 ```jldoctest
@@ -100,7 +100,7 @@ function traverse(
     num_bvtt = traverse_leaves!(bvh, bvtt1, bvtt2, num_bvtt, extra, options)
 
     # Return contact list and the other buffer as possible cache
-    BVHTraversal(start_level, num_checks, num_bvtt, bvtt2, bvtt1)
+    BVHTraversal(start_level, num_checks, Int(num_bvtt), bvtt2, bvtt1)
 end
 
 

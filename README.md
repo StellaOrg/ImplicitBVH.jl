@@ -231,18 +231,18 @@ nodes we need to skip to get to a given node index, following the fantastic idea
 As contact detection is one of the most computationally-intensive parts of physical simulation and computer
 vision applications, ~~we spent a stupid amount of time optimising~~ this implementation has been optimised for maximum performance and scalability:
 
-- Computing bounding volumes is optimised for triangles, e.g. constructing 249,882 `BSphere{Float64}` on a single thread takes 4.47 ms on my Mac M1. The construction itself has zero allocations; all computation can be done in parallel in user code.
+- Computing bounding volumes is optimised for triangles, e.g. constructing 249,882 `BSphere{Float32}` on a single thread takes 4.47 ms on my Mac M1. The construction itself has zero allocations; all computation can be done in parallel in user code.
 - Building a complete bounding volume hierarchy from the 249,882 triangles of [`xyzrgb_dragon.obj`](https://github.com/alecjacobson/common-3d-test-models/blob/master/data/xyzrgb_dragon.obj) takes 11.83 ms single-threaded. The sorting step is the bottleneck, so multi-threading the Morton encoding and BVH up-building does not significantly improve the runtime; waiting on a multi-threaded sorter.
-- Traversing the same 249,882 `BSphere{Float64}` for the triangles (aggregated into `BBox{Float64}` parents) takes 136.38 ms single-threaded and 43.16 ms with 4 threads, at 79% strong scaling.
+  - **Building the BVH on an Nvidia A100 takes 409.58 μs**!
+- Contact detection (`traverse`) of the same 249,882 `BSphere{Float32}` for the triangles (aggregated into `BBox{Float32}` parents) takes 107.25 ms single-threaded on an Intel IceLake 8570 and 37.25 ms with 4 threads, at 72% strong scaling.
+  - **Traversing the BVH on an Nvidia A100 takes 1.14 ms**!
+- Ray-tracing of 100,000 random rays over the same 249,882 `BSphere{Float32}` for the triangles (aggregated into `BBox{Float32}` parents) takes 671.01 ms single-threaded on an Intel IceLake 8570 and 216.99 ms with 4 threads, at 77% strong scaling.
+  - Ray-tracing on an Nvidia A100 takes 2.00 ms.
 
 Only fundamental Julia types are used - e.g. `struct`, `Tuple`, `UInt`, `Float64` - which can be straightforwardly inlined, unrolled and fused by the compiler. These types are also straightforward to transpile to accelerators via [`KernelAbstractions.jl`](https://github.com/JuliaGPU/KernelAbstractions.jl) such as `CUDA`, `AMDGPU`, `oneAPI`, `Apple Metal`.
 
 
 # Roadmap
-
-- Raytracing
-- Atomics on Metal and oneAPI - waiting on Atomix.jl ([Metal Issue](https://github.com/JuliaGPU/Metal.jl/issues/218), [oneAPI Issue](https://github.com/JuliaGPU/oneAPI.jl/issues/336)).
-- Coherent types for indices on GPUs (e.g. when using Int32 in core kernels, only use 32-bit objects)
 - Avoiding / exposing memory allocations (temps, minmax reduce, morton order, etc.)
 - GPU CI
 

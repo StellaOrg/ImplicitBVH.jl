@@ -1,7 +1,8 @@
 [deps]
 AcceleratedKernels = "6a4ca0a5-0e36-4168-a932-d9be78d558f1"
 Atomix = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
-AtomixMetal = "fc0d88fc-5db5-40d7-bf35-da84fd759def"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Cthulhu = "f68482b8-f384-11e8-15f7-abe071a5a75f"
 ImplicitBVH = "932a18dc-bb55-4cd5-bdd6-1368ec9cea29"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"

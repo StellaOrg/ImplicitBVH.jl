@@ -5,7 +5,7 @@
 
 
 using Random
-using Metal: MtlArray
+using CUDA: CuArray
 
 using BenchmarkTools
 
@@ -20,9 +20,11 @@ Random.seed!(0)
 
 num_bvs = 100_000
 bvs = map(BSphere{Float32}, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_bvs])
-bvs = MtlArray(bvs)
+bvs = CuArray(bvs)
 
-options = BVHOptions(block_size=128, num_threads=8)
+options = BVHOptions(block_size=128, num_threads=8, index_exemplar=Int64(0))
+bvh = BVH(bvs, BBox{Float32}, UInt32, 1, options=options)
+
 @benchmark BVH(bvs, BBox{Float32}, UInt32, 1, options=options)
 
 

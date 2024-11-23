@@ -14,6 +14,8 @@ using BenchmarkTools
 using Profile
 using PProf
 
+using CUDA: CuArray
+
 
 # Types used
 const LeafType = BSphere{Float32}
@@ -24,8 +26,10 @@ const MortonType = UInt32
 # Load mesh and compute bounding spheres for each triangle. Can download mesh from:
 # https://github.com/alecjacobson/common-3d-test-models/blob/master/data/xyzrgb_dragon.obj
 mesh = load(joinpath(@__DIR__, "xyzrgb_dragon.obj"))
-@show size(mesh)
+display(mesh)
+
 bounding_spheres = [LeafType(tri) for tri in mesh]
+# bounding_spheres = CuArray(bounding_spheres)
 
 # Pre-compile BVH build
 bvh = BVH(bounding_spheres, NodeType, MortonType)
@@ -35,11 +39,11 @@ println("BVH creation including Morton encoding:")
 display(@benchmark(BVH(bounding_spheres, NodeType, MortonType)))
 
 # Collect a pprof profile of the complete build
-Profile.clear()
-@profile BVH(bounding_spheres, NodeType, MortonType)
+# Profile.clear()
+# @profile BVH(bounding_spheres, NodeType, MortonType)
 
 # Export pprof profile and open interactive profiling web interface.
-pprof(; out="bvh_build.pb.gz")
+# pprof(; out="bvh_build.pb.gz")
 
 
 # Test for some coding mistakes

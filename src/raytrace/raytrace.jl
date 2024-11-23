@@ -1,5 +1,64 @@
 """
+    traverse_rays(
+        bvh::BVH,
+        points::AbstractArray,
+        directions::AbstractArray,
+        start_level::Int=1,
+        cache::Union{Nothing, BVHTraversal}=nothing;
+        options=BVHOptions(),
+    )::BVHTraversal
 
+Compute the intersections between a set of N rays defined by `points` (shape (3, N)) and
+`directions` (shape, (3, N)), and some bounding volumes inside a `bvh`.
+
+Only forward rays are counted - i.e. the direction matters.
+
+The returned [`BVHTraversal`](@ref) `.contacts` field will contain the index pairs
+(iboundingvolume, iray) following the order in `bvh.leaves` and `axes(points, 2)`.
+
+# Examples
+
+```jldoctest
+using ImplicitBVH
+using ImplicitBVH: BBox, BSphere
+
+# Generate some simple bounding spheres
+bounding_spheres = [
+    BSphere{Float32}([0., 0., 0.], 0.5),
+    BSphere{Float32}([0., 0., 1.], 0.6),
+    BSphere{Float32}([0., 0., 2.], 0.5),
+    BSphere{Float32}([0., 0., 3.], 0.4),
+    BSphere{Float32}([0., 0., 4.], 0.6),
+]
+
+# Generate two rays, each defined by a point source and direction
+points = [
+    0.  0 
+    0.  0
+    -1 -1
+]
+
+# One ray passes through all bounding volumes, the other goes downwards and does not
+directions = [
+    0.  0
+    0.  0
+    1.  -1
+]
+
+# Build BVH
+bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
+
+# Traverse BVH for contact detection
+traversal = traverse_rays(bvh, points, directions)
+
+# Reuse traversal buffers for future contact detection - possibly with different BVHs
+traversal = traverse(bvh, points, directions, 2, traversal)
+@show traversal.contacts;
+;
+
+# output
+traversal.contacts = Tuple{Int32, Int32}[(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)]
+```
 """
 function traverse_rays(
     bvh::BVH,
@@ -64,7 +123,7 @@ function traverse_rays(
                                      dst_offsets, options)
 
     # Return contact list and the other buffer as possible cache
-    BVHTraversal(start_level, num_checks, num_bvtt, bvtt2, bvtt1)
+    BVHTraversal(start_level, num_checks, Int(num_bvtt), bvtt2, bvtt1)
 end
 
 
@@ -111,6 +170,13 @@ function initial_bvtt(
     end
 
     # Insert all checks to do at this level
+    fill_initial_bvtt_rays!(bvtt1, level_nodes, num_real, num_rays, options)
+
+    bvtt1, bvtt2, level_checks
+end
+
+
+function fill_initial_bvtt_rays!(bvtt1, level_nodes, num_real, num_rays, options)
     backend = get_backend(bvtt1)
     if backend isa GPU
         # GPU version with the two for loops (see CPU) linearised
@@ -129,13 +195,9 @@ function initial_bvtt(
             end
         end
     end
-
-    bvtt1, bvtt2, level_checks
 end
 
 
 # Traversal implementations
 include("raytrace_cpu.jl")
 include("raytrace_gpu.jl")
-
-

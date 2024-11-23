@@ -34,19 +34,19 @@ bounding_spheres = CuArray(bounding_spheres)
 
 # Pre-compile BVH traversal
 bvh = BVH(bounding_spheres, NodeType, MortonType)
-@show traversal = traverse(bvh)
+@show traversal = traverse(bvh, bvh)
 
 # Print algorithmic efficiency
-eff = traversal.num_checks / (length(bounding_spheres) * length(bounding_spheres) / 2)
+eff = traversal.num_checks / length(bounding_spheres)^2
 println("Did $eff of the total checks needed for brute-force contact detection")
 
-# Benchmark BVH traversal anew
-println("BVH traversal with dynamic buffer resizing:")
-display(@benchmark(traverse(bvh), samples=100))
-
-# Benchmark BVH creation reusing previous cache
-println("BVH traversal without dynamic buffer resizing:")
-display(@benchmark(traverse(bvh, bvh.tree.levels ÷ 2, traversal), samples=100))
+# # Benchmark BVH traversal anew
+# println("BVH traversal with dynamic buffer resizing:")
+# display(@benchmark(traverse(bvh, bvh), samples=100))
+# 
+# # Benchmark BVH creation reusing previous cache
+# println("BVH traversal without dynamic buffer resizing:")
+# display(@benchmark(traverse(bvh, bvh, bvh.tree.levels ÷ 2, bvh.tree.levels ÷ 2, traversal), samples=100))
 
 # Collect a pprof profile
 # Profile.clear()
