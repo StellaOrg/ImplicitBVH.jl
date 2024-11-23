@@ -191,7 +191,11 @@ function BVH(
 
     # Compute indices that sort codes along the Z-curve - closer objects have closer Morton codes
     order = similar(mortons, I)
-    AK.sortperm!(order, mortons, block_size=options.block_size)
+    if mortons isa AbstractGPUVector
+        AK.sortperm!(order, mortons, block_size=options.block_size)
+    else
+        sortperm!(order, mortons)
+    end
 
     # Pre-allocate vector of bounding volumes for the real nodes above the bottom level
     bvh_nodes = similar(bounding_volumes, N, Int(tree.real_nodes - tree.real_leaves))

@@ -236,7 +236,7 @@ vision applications, ~~we spent a stupid amount of time optimising~~ this implem
   - **Building the BVH on an Nvidia A100 takes 409.58 μs**!
 - Contact detection (`traverse`) of the same 249,882 `BSphere{Float32}` for the triangles (aggregated into `BBox{Float32}` parents) takes 107.25 ms single-threaded on an Intel IceLake 8570 and 37.25 ms with 4 threads, at 72% strong scaling.
   - **Traversing the BVH on an Nvidia A100 takes 1.14 ms**!
-- Ray-tracing of 100,000 random rays over the same 249,882 `BSphere{Float32}` for the triangles (aggregated into `BBox{Float32}` parents) takes 671.01 ms single-threaded on an Intel IceLake 8570 and 216.99 ms with 4 threads, at 77% strong scaling.
+- Ray-tracing (`traverse_rays`) of 100,000 random rays over the same 249,882 `BSphere{Float32}` for the triangles (aggregated into `BBox{Float32}` parents) takes 671.01 ms single-threaded on an Intel IceLake 8570 and 216.99 ms with 4 threads, at 77% strong scaling.
   - Ray-tracing on an Nvidia A100 takes 2.00 ms.
 
 Only fundamental Julia types are used - e.g. `struct`, `Tuple`, `UInt`, `Float64` - which can be straightforwardly inlined, unrolled and fused by the compiler. These types are also straightforward to transpile to accelerators via [`KernelAbstractions.jl`](https://github.com/JuliaGPU/KernelAbstractions.jl) such as `CUDA`, `AMDGPU`, `oneAPI`, `Apple Metal`.
