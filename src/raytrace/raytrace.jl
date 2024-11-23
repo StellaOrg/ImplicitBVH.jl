@@ -8,13 +8,13 @@
         options=BVHOptions(),
     )::BVHTraversal
 
-Compute the intersections between a set of N rays defined by `points` (shape (3, N)) and
-`directions` (shape, (3, N)), and some bounding volumes inside a `bvh`.
+Compute the intersections between a set of N rays defined by `points` (shape `(3, N)`) and
+`directions` (shape, `(3, N)`), and some bounding volumes inside a `bvh`.
 
 Only forward rays are counted - i.e. the direction matters.
 
 The returned [`BVHTraversal`](@ref) `.contacts` field will contain the index pairs
-(iboundingvolume, iray) following the order in `bvh.leaves` and `axes(points, 2)`.
+`(iboundingvolume, iray)` following the order in `bvh.leaves` and `axes(points, 2)`.
 
 # Examples
 
@@ -52,7 +52,7 @@ bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
 traversal = traverse_rays(bvh, points, directions)
 
 # Reuse traversal buffers for future contact detection - possibly with different BVHs
-traversal = traverse(bvh, points, directions, 2, traversal)
+traversal = traverse_rays(bvh, points, directions, 2, traversal)
 @show traversal.contacts;
 ;
 
