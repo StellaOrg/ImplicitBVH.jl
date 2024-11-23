@@ -21,7 +21,9 @@ function traverse_rays_nodes!(bvh, points, directions, src, dst, num_src, ::Noth
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
-            istart, iend = tp[i]
+            irange = tp[i]
+            istart = irange.start
+            iend = irange.stop
             tasks[i] = Threads.@spawn traverse_rays_nodes_range!(
                 bvh, points, directions,
                 src, view(dst, 2istart - 1:2iend), view(num_written, i),
@@ -38,7 +40,7 @@ function traverse_rays_nodes!(bvh, points, directions, src, dst, num_src, ::Noth
 
             # Repack written contacts by the second, third thread, etc.
             if i > 1
-                istart, iend = tp[i]
+                istart = tp[i].start
                 for j in 1:task_num_written
                     dst[num_dst + j] = dst[2istart - 1 + j - 1]
                 end
@@ -114,7 +116,9 @@ function traverse_rays_leaves!(bvh, points, directions, src, intersections, num_
         tasks = Vector{Task}(undef, tp.num_tasks)
         num_written = Vector{Int}(undef, tp.num_tasks)
         @inbounds for i in 1:tp.num_tasks
-            istart, iend = tp[i]
+            irange = tp[i]
+            istart = irange.start
+            iend = irange.stop
             tasks[i] = Threads.@spawn traverse_rays_leaves_range!(
                 bvh, points, directions,
                 src, view(intersections, istart:iend), view(num_written, i),
@@ -127,7 +131,7 @@ function traverse_rays_leaves!(bvh, points, directions, src, intersections, num_
 
             # Repack written contacts by the second, third thread, etc.
             if i > 1
-                istart, iend = tp[i]
+                istart = tp[i].start
                 for j in 1:task_num_written
                     intersections[num_intersections + j] = intersections[istart + j - 1]
                 end
