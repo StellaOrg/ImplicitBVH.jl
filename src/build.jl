@@ -29,18 +29,10 @@ Tree Level          Nodes & Leaves               Build Up    Traverse Down
         bounding_volumes::AbstractVector{L},
         node_type::Type{N}=L,
         morton_type::Type{U}=UInt32,
-        built_level=1;
+        built_level=1,
+        cache::Union{Nothing, BVH}=nothing;
         options=BVHOptions(),
     ) where {L, N, U <: MortonUnsigned}
-
-    # Copy constructor reusing previous memory; previous
-    # bounding volumes are moved to new_positions.
-    BVH(
-        prev::BVH,
-        new_positions::AbstractMatrix,
-        built_level=1;
-        options=BVHOptions(),
-    )
 
 # Fields
 - `tree::`[`ImplicitTree`](@ref)`{I <: Integer}`
@@ -116,11 +108,11 @@ bvh = BVH(bounding_spheres, BBox{Float32}, UInt32, 2)
 traversal = traverse(bvh, 3, traversal)
 ```
 
-Update previous BVH bounding volumes' positions and rebuild BVH *reusing previous memory*:
+Reuse previous BVH memory for a new BVH (specifically, the nodes, mortons, and order vectors, but
+not the leaves):
 
 ```julia
-new_positions = rand(3, 5)
-bvh_rebuilt = BVH(bvh, new_positions)
+bvh = BVH(bounding_spheres, BBox{Float32}, UInt32, 1, bvh)
 ```
 """
 struct BVH{
@@ -161,7 +153,8 @@ function BVH(
     bounding_volumes::AbstractVector{L},
     node_type::Type{N}=L,
     morton_type::Type{U}=UInt32,
-    built_level=1;
+    built_level=1,
+    cache::Union{Nothing, BVH}=nothing;
     options=BVHOptions(),
 ) where {L, N, U <: MortonUnsigned}
 
@@ -186,11 +179,24 @@ function BVH(
     built_ilevel = compute_build_level(tree, built_level)
 
     # Compute morton codes for the bounding volumes
-    mortons = similar(bounding_volumes, morton_type)
+    if isnothing(cache)
+        mortons = similar(bounding_volumes, U)
+    else
+        @argcheck eltype(cache.mortons) === U
+        mortons = cache.mortons
+        length(mortons) == numbv || resize!(mortons, numbv)
+    end
     @inbounds morton_encode!(mortons, bounding_volumes, options)
 
     # Compute indices that sort codes along the Z-curve - closer objects have closer Morton codes
-    order = similar(mortons, I)
+    if isnothing(cache)
+        order = similar(mortons, I)
+    else
+        @argcheck eltype(cache.order) === I
+        order = cache.order
+        length(order) == numbv || resize!(order, numbv)
+    end
+
     if mortons isa AbstractGPUVector
         AK.sortperm!(order, mortons, block_size=options.block_size)
     else
@@ -198,7 +204,14 @@ function BVH(
     end
 
     # Pre-allocate vector of bounding volumes for the real nodes above the bottom level
-    bvh_nodes = similar(bounding_volumes, N, Int(tree.real_nodes - tree.real_leaves))
+    num_nodes = Int(tree.real_nodes - tree.real_leaves)
+    if isnothing(cache)
+        bvh_nodes = similar(bounding_volumes, N, num_nodes)
+    else
+        @argcheck eltype(cache.nodes) === N
+        bvh_nodes = cache.nodes
+        length(bvh_nodes) == num_nodes || resize!(bvh_nodes, num_nodes)
+    end
 
     # Aggregate bounding volumes up to built_ilevel
     if tree.real_nodes >= 2
@@ -206,81 +219,6 @@ function BVH(
     end
 
     BVH(I(built_ilevel), tree, bvh_nodes, bounding_volumes, mortons, order)
-end
-
-
-# Copy constructor reusing previous memory; previous bounding volumes are moved to new_positions.
-function BVH(
-    prev::BVH,
-    new_positions::AbstractMatrix,
-    built_level=1;
-    options=BVHOptions(),
-)
-
-    # Ensure correctness
-    @argcheck size(new_positions, 1) == 3 "new_positions need 3D coordinates on first axis"
-    @argcheck size(new_positions, 2) == length(prev.leaves) "Different number of new_positions"
-    @argcheck firstindex(new_positions, 1) == 1 "BVH vector types must be 1-indexed"
-    @argcheck firstindex(new_positions, 2) == 1 "BVH vector types must be 1-indexed"
-
-    # Get index type from exemplar
-    index_type = get_index_type(options)
-
-    # Extract previous BVH fields
-    tree = prev.tree
-    bvh_nodes = prev.nodes
-    bounding_volumes = prev.leaves
-    mortons = prev.mortons
-    order = prev.order
-
-    # Compute level up to which tree should be built
-    built_ilevel = index_type(compute_build_level(tree, built_level))
-
-    # Move the centres of previous bounding volumes to the coordinates of new_positions; ensure we
-    # use the same type as in prev
-    @inbounds @inline function _move_bv!(bounding_volumes, new_positions, i)
-        bv = bounding_volumes[i]
-        c = center(bv)
-        T = eltype(c)
-
-        # Special-case BSphere which can be translated by just overwriting centre
-        if bv isa BSphere
-            new_x = (T(new_positions[1, i]), T(new_positions[2, i]), T(new_positions[3, i]))
-            bounding_volumes[i] = BSphere{T}(new_x, bv.r)
-        else
-            dx = (T(new_positions[1, i]) - c[1],
-                  T(new_positions[2, i]) - c[2],
-                  T(new_positions[3, i]) - c[3])
-            bounding_volumes[i] = translate(bv, dx)
-        end
-    end
-
-    AK.foreachindex(
-        bounding_volumes,
-        block_size=options.block_size,
-        scheduler=options.scheduler,
-        max_tasks=options.num_threads,
-        min_elems=options.min_boundings_per_thread,
-    ) do i
-        _move_bv!(bounding_volumes, new_positions, i)
-    end
-
-    # Recompute Morton codes
-    @inbounds morton_encode!(mortons, bounding_volumes, options)
-
-    # Compute indices that sort codes along the Z-curve - closer objects have closer Morton codes
-    if mortons isa AbstractGPUVector
-        AK.merge_sortperm_lowmem!(order, mortons, block_size=options.block_size)
-    else
-        sortperm!(order, mortons)
-    end
-
-    # Aggregate bounding volumes up to built_ilevel
-    if tree.real_nodes >= 2
-        aggregate_oibvh!(bvh_nodes, bounding_volumes, tree, order, built_ilevel, options)
-    end
-
-    BVH(built_ilevel, tree, bvh_nodes, bounding_volumes, mortons, order)
 end
 
 

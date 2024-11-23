@@ -12,9 +12,3 @@ ImplicitBVH.iscontact
 ImplicitBVH.isintersection
 ImplicitBVH.center
 ```
-
-## Miscellaneous
-
-```@docs
-ImplicitBVH.translate
-```

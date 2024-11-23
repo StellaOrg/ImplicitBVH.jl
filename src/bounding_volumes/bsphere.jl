@@ -135,12 +135,3 @@ end
 
 # Overloaded center function
 center(b::BSphere) = b.x
-
-
-# Overloaded translate function
-function translate(b::BSphere{T}, dx) where T
-    new_center = (b.x[1] + T(dx[1]),
-                  b.x[2] + T(dx[2]),
-                  b.x[3] + T(dx[3]))
-    BSphere{T}(new_center, b.r)
-end

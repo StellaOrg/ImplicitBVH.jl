@@ -14,7 +14,7 @@ using BenchmarkTools
 using Profile
 using PProf
 
-using CUDA: CuArray
+# using CUDA: CuArray
 
 
 # Types used
@@ -37,6 +37,10 @@ bvh = BVH(bounding_spheres, NodeType, MortonType)
 # Benchmark BVH creation including Morton encoding
 println("BVH creation including Morton encoding:")
 display(@benchmark(BVH(bounding_spheres, NodeType, MortonType)))
+
+println("BVH with cached memory reuse:")
+display(@benchmark(BVH(bvh.leaves, NodeType, MortonType, 1, bvh)))
+
 
 # Collect a pprof profile of the complete build
 # Profile.clear()

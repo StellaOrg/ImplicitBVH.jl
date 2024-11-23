@@ -64,15 +64,6 @@ Get the coordinates of a bounding volume's centre, as a NTuple{3, T}.
 function center end
 
 
-"""
-    translate(b::BSphere{T}, dx) where T
-    translate(b::BBox{T}, dx) where T
-
-Get a new bounding volume translated by dx; dx can be any iterable with 3 elements.
-"""
-function translate end
-
-
 # Sub-includes
 include("bsphere.jl")
 include("bbox.jl")

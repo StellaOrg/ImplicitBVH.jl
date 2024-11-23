@@ -98,16 +98,3 @@ end
 center(b::BBox{T}) where T = (T(0.5) * (b.lo[1] + b.up[1]),
                               T(0.5) * (b.lo[2] + b.up[2]),
                               T(0.5) * (b.lo[3] + b.up[3]))
-
-
-# Overloaded translate function
-function translate(b::BBox{T}, dx) where T
-    dx1, dx2, dx3 = T(dx[1]), T(dx[2]), T(dx[3])
-    new_lo = (b.lo[1] + dx1,
-              b.lo[2] + dx2,
-              b.lo[3] + dx3)
-    new_up = (b.up[1] + dx1,
-              b.up[2] + dx2,
-              b.up[3] + dx3)
-    BBox{T}(new_lo, new_up)
-end
