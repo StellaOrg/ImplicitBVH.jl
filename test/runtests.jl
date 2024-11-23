@@ -773,7 +773,10 @@ end
     BVH(bvs, BBox{Float64}, UInt32, 0.0)
     BVH(bvs, BBox{Float64}, UInt32, 0.5)
     BVH(bvs, BBox{Float64}, UInt32, 1.0)
-    BVH(bvs, BBox{Float64}, UInt32, 3, bvh)
+    BVH(bvs, BSphere{Float64}, UInt32, 3, bvh)
+
+    # Type mismatch between cache (BSphere) and nodes (BBox)
+    @test_throws ArgumentError BVH(bvs, BBox{Float64}, UInt32, 1, bvh)
 
     traverse(bvh, 3)
     traverse(bvh, 3, traversal)
