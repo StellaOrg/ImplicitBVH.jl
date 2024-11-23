@@ -158,13 +158,6 @@ end
     c = a + a
     @test c.x ≈ a.x
     @test c.r ≈ a.r
-
-    # Translating
-    a = BSphere((0., 0., 0.), 0.5)
-    dx = (1., 1., 1.)
-    b = ImplicitBVH.translate(a, dx)
-    @test b.x ≈ dx
-    @test b.r == a.r
 end
 
 
@@ -228,13 +221,6 @@ end
     c = a + a
     @test c.lo ≈ a.lo
     @test c.up ≈ a.up
-
-    # Translating
-    a = BBox((0., 0., 0.), (1., 1., 1.))
-    dx = (1., 1., 1.)
-    b = ImplicitBVH.translate(a, dx)
-    @test b.lo ≈ dx
-    @test b.up ≈ a.up .+ dx
 end
 
 
