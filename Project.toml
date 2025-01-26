@@ -1,7 +1,7 @@
 name = "ImplicitBVH"
 uuid = "932a18dc-bb55-4cd5-bdd6-1368ec9cea29"
 authors = ["Andrei Leonard Nicusan <leonard@evophase.co.uk> and contributors"]
-version = "0.5.0"
+version = "0.5.1"
 
 [deps]
 AcceleratedKernels = "6a4ca0a5-0e36-4168-a932-d9be78d558f1"
@@ -20,4 +20,4 @@ DocStringExtensions = "0.9"
 GPUArraysCore = "0.1, 0.2"
 KernelAbstractions = "0.9"
 LinearAlgebra = "1"
-julia = "1.6"
+julia = "1.10"
