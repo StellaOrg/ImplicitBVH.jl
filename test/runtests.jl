@@ -333,7 +333,6 @@ end
     point = [0., 0., 0.]
     direction = [0., 0., -1.]
     @test isintersection(sphere, point, direction) == true
-
 end
 
 
@@ -691,6 +690,8 @@ end
     @test (1, 3) in traversal.contacts
     @test (1, 2) in traversal.contacts
 end
+
+
 
 
 @testset "bvh_single_randomised" begin

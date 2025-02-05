@@ -21,6 +21,21 @@ function array_from_host(h_arr::AbstractArray, dtype=nothing)
 end
 
 
+@testset "mortons_gpu_$(backend)" begin
+    # This tests BV bounds computation too
+    Random.seed!(42)
+    for num_entities in 1:200
+        bvs = map(BSphere{Float32}, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
+        bvs_gpu = array_from_host(bvs)
+
+        mortons = ImplicitBVH.morton_encode(bvs)
+        mortons_gpu = ImplicitBVH.morton_encode(bvs_gpu)
+
+        @test all(mortons .== Array(mortons_gpu))
+    end
+end
+
+
 @testset "bvh_gpu_$(backend)_single_randomised" begin
     # Random bounding volumes of different densities; BSphere leaves, BSphere nodes
     Random.seed!(42)

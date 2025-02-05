@@ -149,7 +149,7 @@ function fill_initial_bvtt_single!(bvtt1, num_levels, start_level, level_nodes, 
     if backend isa GPU
 
         # Convert linear index k to upper triangular (i, j) indices for a matrix of side n; 0-index
-        @fastmath function tri_ij(n::I, k::I) where I <: Integer
+        function tri_ij(n::I, k::I) where I <: Integer
             a = Float32(-8 * k + 4 * n * (n - 1) - 7)
             b = unsafe_trunc(I, sqrt(a) / 2.0f0 - 0.5f0)
             i = n - 2 - b

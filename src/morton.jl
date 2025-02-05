@@ -150,6 +150,7 @@ function _compute_extrema(bounding_volumes::AbstractGPUVector, options)
         min_centers,        # Reduce to the 3D minimum
         bounding_volumes,
         init=(floatmax(T), floatmax(T), floatmax(T)),
+        neutral=(floatmax(T), floatmax(T), floatmax(T)),
         block_size=options.block_size,
     )
 
@@ -158,6 +159,7 @@ function _compute_extrema(bounding_volumes::AbstractGPUVector, options)
         max_centers,
         bounding_volumes,
         init=(floatmin(T), floatmin(T), floatmin(T)),
+        neutral=(floatmin(T), floatmin(T), floatmin(T)),
         block_size=options.block_size,
     )
 
