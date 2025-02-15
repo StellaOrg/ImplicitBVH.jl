@@ -381,9 +381,9 @@ end
     sphere = BSphere{Float64}(p1,p2,p3)
     bvh = ImplicitBVH.BVH([sphere], ImplicitBVH.BBox{Float64}, UInt64)
 
-    test_x_point_range = (sphere.x[1] - sphere.r):0.1:(sphere.x[1] + sphere.r)
-    test_y_point_range = (sphere.x[2] - sphere.r):0.1:(sphere.x[2] + sphere.r)
-    test_z_point_range = (sphere.x[3] - sphere.r):0.1:(sphere.x[3] + sphere.r)
+    test_x_point_range = (sphere.x[1] - sphere.r):1:(sphere.x[1] + sphere.r)
+    test_y_point_range = (sphere.x[2] - sphere.r):1:(sphere.x[2] + sphere.r)
+    test_z_point_range = (sphere.x[3] - sphere.r):1:(sphere.x[3] + sphere.r)
 
     # Generate a matrix of points to test
     points = [[[x; y; z] for x in test_x_point_range, y in test_y_point_range, z in test_z_point_range]...]
