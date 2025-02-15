@@ -64,9 +64,12 @@ end
     discriminant = b * b - T(4) * a * c
 
     if discriminant >= T(0)
-        # Ensure only forwards intersections are counted
-        return T(0) >= b * c
+        if b <= T(0)
+            return true
+        else
+            return T(0) >= c
+        end
     else
         return false
-    end    
+    end
 end
