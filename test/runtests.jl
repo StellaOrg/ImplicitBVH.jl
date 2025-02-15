@@ -333,6 +333,190 @@ end
     point = [0., 0., 0.]
     direction = [0., 0., -1.]
     @test isintersection(sphere, point, direction) == true
+
+    # Further test catching edge case
+    p1 = Float64[0.7944654, 1.1890014, -9.944]
+    p2 = Float64[0.7944654, 1.1890014, 9.944]
+    p3 = Float64[1.0111626, 1.0111626, 9.944]
+
+    sphere = BSphere{Float64}(p1,p2,p3)
+
+    point = [0.06193274031408013,  0.2784058141640002, -0.5958244153640522]
+    direction =  [1.234273402834,1.3345079039745,1.655801924902346]
+
+    @test isintersection(sphere, point, direction) == true
+    @test isintersection(sphere, point, -direction) == true
+
+    point = [1.324708895688473, -0.10181227219111069, 0.39207172638978677]
+    direction =  [1.234273402834,1.3345079039745,1.655801924902346]
+
+    @test isintersection(sphere, point, direction) == true
+    @test isintersection(sphere, point, -direction) == true
+
+    p1 = Float64[1.4025228, 0.27897915, -9.944]
+    p2 = Float64[1.43, 0.0, 9.944]
+    p3 = Float64[1.43, 0.0, -9.944]
+
+    sphere = BSphere{Float64}(p1,p2,p3)
+
+    point = [0.06193274031408013,  0.2784058141640002, -0.5958244153640522]
+    direction =  [1.234273402834,1.3345079039745,1.655801924902346]
+
+    @test isintersection(sphere, point, direction) == true
+    @test isintersection(sphere, point, -direction) == true
+
+    point = [1.324708895688473, -0.10181227219111069, 0.39207172638978677]
+    direction =  [1.234273402834,1.3345079039745,1.655801924902346]
+
+    @test isintersection(sphere, point, direction) == true
+    @test isintersection(sphere, point, -direction) == true
+
+    # Extensive ray tests
+    # Spehere for testing
+
+    p1 = Float64[0.7944654, 1.1890014, -9.944]
+    p2 = Float64[0.7944654, 1.1890014, 9.944]
+    p3 = Float64[1.0111626, 1.0111626, 9.944]
+
+    sphere = BSphere{Float64}(p1,p2,p3)
+    bvh = ImplicitBVH.BVH([sphere], ImplicitBVH.BBox{Float64}, UInt64)
+
+    test_x_point_range = (sphere.x[1] - sphere.r):0.1:(sphere.x[1] + sphere.r)
+    test_y_point_range = (sphere.x[2] - sphere.r):0.1:(sphere.x[2] + sphere.r)
+    test_z_point_range = (sphere.x[3] - sphere.r):0.1:(sphere.x[3] + sphere.r)
+
+    # Generate a matrix of points to test
+    points = [[[x; y; z] for x in test_x_point_range, y in test_y_point_range, z in test_z_point_range]...]
+    points = mapreduce(permutedims, vcat, points)'
+
+    # define test ray directions
+    x_plus_ray = [1,0,0] .* ones(3, size(points, 2))
+    x_minus_ray = [-1,0,0] .* ones(3, size(points, 2))
+    y_plus_ray = [0,1,0] .* ones(3, size(points, 2))
+    y_minus_ray = [0,-1,0] .* ones(3, size(points, 2))
+    z_plus_ray = [0,0,1] .* ones(3, size(points, 2))
+    z_minus_ray = [0,0,-1] .* ones(3, size(points, 2))
+
+    x_plus_traversal = traverse_rays(bvh, points, x_plus_ray)
+    x_minus_traversal = traverse_rays(bvh, points, x_minus_ray)
+    y_plus_traversal = traverse_rays(bvh, points, y_plus_ray)
+    y_minus_traversal = traverse_rays(bvh, points, y_minus_ray)
+    z_plus_traversal = traverse_rays(bvh, points, z_plus_ray)
+    z_minus_traversal = traverse_rays(bvh, points, z_minus_ray)
+
+    x_plus_contacts = x_plus_traversal.contacts
+    x_minus_contacts = x_minus_traversal.contacts
+    y_plus_contacts = y_plus_traversal.contacts
+    y_minus_contacts = y_minus_traversal.contacts
+    z_plus_contacts = z_plus_traversal.contacts
+    z_minus_contacts = z_minus_traversal.contacts
+
+    # Define BVH traversal contacts
+    x_plus_p_contacts = [contact[2] for contact in x_plus_contacts]
+    x_minus_p_contacts = [contact[2] for contact in x_minus_contacts]
+    y_plus_p_contacts = [contact[2] for contact in y_plus_contacts]
+    y_minus_p_contacts = [contact[2] for contact in y_minus_contacts]
+    z_plus_p_contacts = [contact[2] for contact in z_plus_contacts]
+    z_minus_p_contacts = [contact[2] for contact in z_minus_contacts]
+
+    # Positive ray in the x direction
+    # All points that lie to the left of the sphere center and in the circle in the yz plane
+    # should have a contact. Contacts to the right of the sphere center should only occur if the point is
+    # inside the sphere
+
+    x_plus_calculated_contacts = []
+    for i in 1:size(points, 2)
+        if points[1, i] <= sphere.x[1] && norm(points[2:3, i] .- sphere.x[2:3]) <= sphere.r
+            push!(x_plus_calculated_contacts, i)
+        elseif points[1, i] > sphere.x[1] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
+            push!(x_plus_calculated_contacts, i)
+        end
+    end
+
+    @test x_plus_p_contacts == x_plus_calculated_contacts
+
+    # Negative ray in the x direction
+    # All points that lie to the right of the sphere center and in the circle in the yz plane
+    # should have a contact. Contacts to the left of the sphere center should only occur if the point is
+    # inside the sphere
+
+    x_minus_calculated_contacts = []
+    for i in 1:size(points, 2)
+        if points[1, i] >= sphere.x[1] && norm(points[2:3, i] .- sphere.x[2:3]) <= sphere.r
+            push!(x_minus_calculated_contacts, i)
+        elseif points[1, i] < sphere.x[1] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
+            push!(x_minus_calculated_contacts, i)
+        end
+    end
+
+    @test x_minus_p_contacts == x_minus_calculated_contacts
+
+    # Positive ray in the y direction
+    # All points that lie below the sphere center and in the circle in the xz plane
+    # should have a contact. Contacts above the sphere center should only occur if the point is
+    # inside the sphere
+
+    y_plus_calculated_contacts = []
+
+    for i in 1:size(points, 2)
+        if points[2, i] <= sphere.x[2] && norm(points[[1,3], i] .- sphere.x[[1,3]]) <= sphere.r
+            push!(y_plus_calculated_contacts, i)
+        elseif points[2, i] > sphere.x[2] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
+            push!(y_plus_calculated_contacts, i)
+        end
+    end
+
+    @test y_plus_p_contacts == y_plus_calculated_contacts
+
+    # Negative ray in the y direction
+    # All points that lie above the sphere center and in the circle in the xz plane
+    # should have a contact. Contacts below the sphere center should only occur if the point is
+    # inside the sphere
+
+    y_minus_calculated_contacts = []
+
+    for i in 1:size(points, 2)
+        if points[2, i] >= sphere.x[2] && norm(points[[1,3], i] .- sphere.x[[1,3]]) <= sphere.r
+            push!(y_minus_calculated_contacts, i)
+        elseif points[2, i] < sphere.x[2] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
+            push!(y_minus_calculated_contacts, i)
+        end
+    end
+
+    @test y_minus_p_contacts == y_minus_calculated_contacts
+    
+    # Positive ray in the z direction
+    # All points that lie below the sphere center and in the circle in the xy plane 
+    # should have a contact. Contacts above the sphere center should only occur if the point is 
+    # inside the sphere
+
+    z_plus_calculated_contacts = []
+    for i in 1:size(points, 2)
+        if points[3, i] <= sphere.x[3] && norm(points[1:2, i] .- sphere.x[1:2]) <= sphere.r
+            push!(z_plus_calculated_contacts, i)
+        elseif points[3, i] > sphere.x[3] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
+            push!(z_plus_calculated_contacts, i)
+        end
+    end
+
+    @test z_plus_p_contacts == z_plus_calculated_contacts
+
+    # Negative ray in the z direction
+    # All points that lie above the sphere center and in the circle in the xy plane
+    # should have a contact. Contacts below the sphere center should only occur if the point is
+    # inside the sphere
+
+    z_minus_calculated_contacts = []
+    for i in 1:size(points, 2)
+        if points[3, i] >= sphere.x[3] && norm(points[1:2, i] .- sphere.x[1:2]) <= sphere.r
+            push!(z_minus_calculated_contacts, i)
+        elseif points[3, i] < sphere.x[3] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
+            push!(z_minus_calculated_contacts, i)
+        end
+    end
+
+    @test z_minus_p_contacts == z_minus_calculated_contacts
+
 end
 
 
@@ -958,4 +1142,3 @@ elseif "--Metal" in ARGS
     const backend = MetalBackend()
     include(joinpath(@__DIR__, "gputests.jl"))
 end
-
