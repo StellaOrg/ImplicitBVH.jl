@@ -373,7 +373,6 @@ end
 
     # Extensive ray tests
     # Spehere for testing
-
     p1 = Float64[0.7944654, 1.1890014, -9.944]
     p2 = Float64[0.7944654, 1.1890014, 9.944]
     p3 = Float64[1.0111626, 1.0111626, 9.944]
@@ -423,7 +422,6 @@ end
     # All points that lie to the left of the sphere center and in the circle in the yz plane
     # should have a contact. Contacts to the right of the sphere center should only occur if the point is
     # inside the sphere
-
     x_plus_calculated_contacts = []
     for i in 1:size(points, 2)
         if points[1, i] <= sphere.x[1] && norm(points[2:3, i] .- sphere.x[2:3]) <= sphere.r
@@ -439,7 +437,6 @@ end
     # All points that lie to the right of the sphere center and in the circle in the yz plane
     # should have a contact. Contacts to the left of the sphere center should only occur if the point is
     # inside the sphere
-
     x_minus_calculated_contacts = []
     for i in 1:size(points, 2)
         if points[1, i] >= sphere.x[1] && norm(points[2:3, i] .- sphere.x[2:3]) <= sphere.r
@@ -455,9 +452,7 @@ end
     # All points that lie below the sphere center and in the circle in the xz plane
     # should have a contact. Contacts above the sphere center should only occur if the point is
     # inside the sphere
-
     y_plus_calculated_contacts = []
-
     for i in 1:size(points, 2)
         if points[2, i] <= sphere.x[2] && norm(points[[1,3], i] .- sphere.x[[1,3]]) <= sphere.r
             push!(y_plus_calculated_contacts, i)
@@ -472,9 +467,7 @@ end
     # All points that lie above the sphere center and in the circle in the xz plane
     # should have a contact. Contacts below the sphere center should only occur if the point is
     # inside the sphere
-
     y_minus_calculated_contacts = []
-
     for i in 1:size(points, 2)
         if points[2, i] >= sphere.x[2] && norm(points[[1,3], i] .- sphere.x[[1,3]]) <= sphere.r
             push!(y_minus_calculated_contacts, i)
@@ -489,7 +482,6 @@ end
     # All points that lie below the sphere center and in the circle in the xy plane 
     # should have a contact. Contacts above the sphere center should only occur if the point is 
     # inside the sphere
-
     z_plus_calculated_contacts = []
     for i in 1:size(points, 2)
         if points[3, i] <= sphere.x[3] && norm(points[1:2, i] .- sphere.x[1:2]) <= sphere.r
@@ -505,7 +497,6 @@ end
     # All points that lie above the sphere center and in the circle in the xy plane
     # should have a contact. Contacts below the sphere center should only occur if the point is
     # inside the sphere
-
     z_minus_calculated_contacts = []
     for i in 1:size(points, 2)
         if points[3, i] >= sphere.x[3] && norm(points[1:2, i] .- sphere.x[1:2]) <= sphere.r
@@ -516,7 +507,6 @@ end
     end
 
     @test z_minus_p_contacts == z_minus_calculated_contacts
-
 end
 
 
