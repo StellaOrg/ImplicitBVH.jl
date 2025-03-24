@@ -23,7 +23,7 @@ function traverse_rays_nodes!(bvh, points, directions, src, dst, num_src, dst_of
 end
 
 
-@kernel cpu=false inbounds=true function _traverse_rays_nodes_gpu!(
+@kernel cpu=false inbounds=true unsafe_indices=true function _traverse_rays_nodes_gpu!(
     tree, nodes, points, directions,
     src, dst, num_src, dst_offsets, idst_offsets,
     num_skips,
@@ -32,7 +32,7 @@ end
     iblock = @index(Group, Linear)
     ithread = @index(Local, Linear)
 
-    block_size = @groupsize()[1]
+    @uniform block_size = @groupsize()[1]
 
     # At most 2N sprouted checks from N src
     temp = @localmem eltype(dst) (0x2 * block_size,)
@@ -121,7 +121,7 @@ function traverse_rays_leaves!(
 end
 
 
-@kernel cpu=false inbounds=true function _traverse_rays_leaves_gpu!(
+@kernel cpu=false inbounds=true unsafe_indices=true function _traverse_rays_leaves_gpu!(
     leaves, order, points, directions,
     src, dst, num_src, dst_offsets,
     num_above,
@@ -130,7 +130,7 @@ end
     iblock = @index(Group, Linear)
     ithread = @index(Local, Linear)
 
-    block_size = @groupsize()[1]
+    @uniform block_size = @groupsize()[1]
 
     # At most N sprouted checks from N src
     temp = @localmem eltype(dst) (block_size,)
