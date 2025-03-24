@@ -23,6 +23,9 @@ Tree Level          Nodes & Leaves               Build Up    Traverse Down
             -------Real------- ---Virtual---
 ```
 
+Note: in order to not mutate the leaves (you may store them somewhere else, and this avoids making
+a copy), we save the sorted order of the BVH leaves inside the `order` field.
+
 # Methods
     # Normal constructor which builds BVH
     BVH(

@@ -31,7 +31,7 @@ function traverse_nodes_pair!(bvh1, bvh2, src::AbstractGPUVector, dst::AbstractG
 end
 
 
-@kernel cpu=false inbounds=true function _traverse_nodes_pair_gpu!(
+@kernel cpu=false inbounds=true unsafe_indices=true function _traverse_nodes_pair_gpu!(
     tree1, tree2,
     @Const(nodes1), @Const(nodes2),
     @Const(src), dst, num_src, dst_offsets, idst_offsets,
@@ -41,7 +41,7 @@ end
     iblock = @index(Group, Linear)
     ithread = @index(Local, Linear)
 
-    block_size = @groupsize()[1]
+    @uniform block_size = @groupsize()[1]
 
     # At most 4N sprouted checks from N src
     temp = @localmem eltype(dst) (0x4 * block_size,)
@@ -152,7 +152,7 @@ function traverse_nodes_left!(bvh1, bvh2, src::AbstractGPUVector, dst::AbstractG
 end
 
 
-@kernel cpu=false inbounds=true function _traverse_nodes_left_gpu!(
+@kernel cpu=false inbounds=true unsafe_indices=true function _traverse_nodes_left_gpu!(
     tree1, tree2,
     @Const(nodes1), @Const(nodes2),
     @Const(src), dst, num_src, dst_offsets, idst_offsets,
@@ -162,7 +162,7 @@ end
     iblock = @index(Group, Linear)
     ithread = @index(Local, Linear)
 
-    block_size = @groupsize()[1]
+    @uniform block_size = @groupsize()[1]
 
     # At most 2N sprouted checks from N src
     temp = @localmem eltype(dst) (0x2 * block_size,)
@@ -255,7 +255,7 @@ function traverse_nodes_right!(bvh1, bvh2, src::AbstractGPUVector, dst::Abstract
 end
 
 
-@kernel cpu=false inbounds=true function _traverse_nodes_right_gpu!(
+@kernel cpu=false inbounds=true unsafe_indices=true function _traverse_nodes_right_gpu!(
     tree1, tree2,
     @Const(nodes1), @Const(nodes2),
     @Const(src), dst, num_src, dst_offsets, idst_offsets,
@@ -265,7 +265,7 @@ end
     iblock = @index(Group, Linear)
     ithread = @index(Local, Linear)
 
-    block_size = @groupsize()[1]
+    @uniform block_size = @groupsize()[1]
 
     # At most 2N sprouted checks from N src
     temp = @localmem eltype(dst) (0x2 * block_size,)
@@ -357,7 +357,7 @@ function traverse_nodes_leaves_left!(bvh1, bvh2, src::AbstractGPUVector, dst::Ab
 end
 
 
-@kernel cpu=false inbounds=true function _traverse_nodes_leaves_left_gpu!(
+@kernel cpu=false inbounds=true unsafe_indices=true function _traverse_nodes_leaves_left_gpu!(
     tree1, tree2,
     @Const(nodes1), @Const(leaves2), @Const(order2),
     @Const(src), dst, num_src, dst_offsets, idst_offsets,
@@ -367,7 +367,7 @@ end
     iblock = @index(Group, Linear)
     ithread = @index(Local, Linear)
 
-    block_size = @groupsize()[1]
+    @uniform block_size = @groupsize()[1]
 
     # At most 2N sprouted checks from N src
     temp = @localmem eltype(dst) (0x2 * block_size,)
@@ -461,7 +461,7 @@ function traverse_nodes_leaves_right!(bvh1, bvh2, src::AbstractGPUVector, dst::A
 end
 
 
-@kernel cpu=false inbounds=true function _traverse_nodes_leaves_right_gpu!(
+@kernel cpu=false inbounds=true unsafe_indices=true function _traverse_nodes_leaves_right_gpu!(
     tree1, tree2,
     @Const(leaves1), @Const(nodes2), @Const(order1),
     @Const(src), dst, num_src, dst_offsets, idst_offsets,
@@ -471,7 +471,7 @@ end
     iblock = @index(Group, Linear)
     ithread = @index(Local, Linear)
 
-    block_size = @groupsize()[1]
+    @uniform block_size = @groupsize()[1]
 
     # At most 2N sprouted checks from N src
     temp = @localmem eltype(dst) (0x2 * block_size,)
@@ -558,7 +558,7 @@ function traverse_leaves_pair!(bvh1, bvh2, src::AbstractGPUVector, contacts::Abs
 end
 
 
-@kernel cpu=false inbounds=true function _traverse_leaves_pair_gpu!(
+@kernel cpu=false inbounds=true unsafe_indices=true function _traverse_leaves_pair_gpu!(
     @Const(leaves1), @Const(leaves2), @Const(order1), @Const(order2),
     @Const(src), dst,
     num_src, dst_offsets,
@@ -568,7 +568,7 @@ end
     iblock = @index(Group, Linear)
     ithread = @index(Local, Linear)
 
-    block_size = @groupsize()[1]
+    @uniform block_size = @groupsize()[1]
 
     # At most N sprouted checks from N src
     temp = @localmem eltype(dst) (block_size,)

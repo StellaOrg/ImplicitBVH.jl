@@ -27,7 +27,7 @@ end
 
 
 
-@kernel cpu=false inbounds=true function _traverse_nodes_gpu!(
+@kernel cpu=false inbounds=true unsafe_indices=true function _traverse_nodes_gpu!(
     tree, @Const(nodes),
     @Const(src), dst,
     num_src, dst_offsets, level,
@@ -37,7 +37,7 @@ end
     iblock = @index(Group, Linear)
     ithread = @index(Local, Linear)
 
-    block_size = @groupsize()[0x1]
+    @uniform block_size = @groupsize()[0x1]
 
     # At most 4N sprouted checks from N src
     temp = @localmem eltype(dst) (0x4 * block_size,)
@@ -149,7 +149,7 @@ end
 
 
 
-@kernel cpu=false inbounds=true function _traverse_leaves_gpu!(
+@kernel cpu=false inbounds=true unsafe_indices=true function _traverse_leaves_gpu!(
     @Const(leaves), @Const(order),
     @Const(src), dst,
     num_src, dst_offsets,
@@ -159,7 +159,7 @@ end
     iblock = @index(Group, Linear)
     ithread = @index(Local, Linear)
 
-    block_size = @groupsize()[0x1]
+    @uniform block_size = @groupsize()[0x1]
 
     # At most N contacts in dst from N src
     temp = @localmem eltype(dst) (block_size,)
