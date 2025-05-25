@@ -199,12 +199,12 @@ function BVH(
         order = cache.order
         length(order) == numbv || resize!(order, numbv)
     end
-
-    if mortons isa AbstractGPUVector
-        AK.sortperm!(order, mortons, block_size=options.block_size)
-    else
-        sortperm!(order, mortons)
-    end
+    AK.sortperm!(
+        order, mortons,
+        max_tasks=options.num_threads,
+        min_elems=options.min_sorts_per_thread,
+        block_size=options.block_size,
+    )
 
     # Pre-allocate vector of bounding volumes for the real nodes above the bottom level
     num_nodes = Int(tree.real_nodes - tree.real_leaves)
@@ -295,7 +295,6 @@ function aggregate_last_level_kernel!(
     AK.foreachindex(
         irange, backend,
         block_size=options.block_size,
-        scheduler=options.scheduler,
         max_tasks=options.num_threads,
         min_elems=options.min_boundings_per_thread,
     ) do i
@@ -383,7 +382,6 @@ function aggregate_level_kernel!(
     AK.foreachindex(
         irange, backend,
         block_size=options.block_size,
-        scheduler=options.scheduler,
         max_tasks=options.num_threads,
         min_elems=options.min_boundings_per_thread,
     ) do i

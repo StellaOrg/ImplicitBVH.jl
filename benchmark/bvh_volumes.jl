@@ -7,6 +7,8 @@
 using ImplicitBVH
 using ImplicitBVH: BSphere, BBox
 
+import AcceleratedKernels as AK
+
 using MeshIO
 using FileIO
 
@@ -24,16 +26,16 @@ const MortonType = UInt32
 # Load mesh and compute bounding spheres for each triangle. Can download mesh from:
 # https://github.com/alecjacobson/common-3d-test-models/blob/master/data/xyzrgb_dragon.obj
 mesh = load(joinpath(@__DIR__, "xyzrgb_dragon.obj"))
-@show size(mesh)
+display(mesh)
 
 # Example single-threaded user code to compute bounding volumes for each triangle in a mesh
 function fill_bounding_volumes!(bounding_volumes, mesh)
-    @inbounds for i in axes(bounding_volumes, 1)
-        bounding_volumes[i] = eltype(bounding_volumes)(mesh[i])
+    AK.foreachindex(bounding_volumes) do i
+        @inbounds bounding_volumes[i] = eltype(bounding_volumes)(mesh[i])
     end
 end
 
-bounding_spheres = Vector{LeafType}(undef, size(mesh, 1))
+bounding_spheres = Vector{LeafType}(undef, length(mesh.faces))
 display(@benchmark(fill_bounding_volumes!(bounding_spheres, mesh)))
 
 

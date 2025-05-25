@@ -71,10 +71,8 @@ function traverse(
         backend = get_backend(bvtt1)
         KernelAbstractions.zeros(backend, I, Int(bvh.tree.levels))
     else
-        # For CPUs we need a vector of spawned tasks and a contact counter for each task
-        tasks = Vector{Task}(undef, options.num_threads)
-        num_written = Vector{Int}(undef, options.num_threads)
-        (tasks, num_written)
+        # For CPUs we need a contact counter for each task
+        Vector{Int}(undef, options.num_threads)
     end
 
     level = start_level
@@ -85,9 +83,9 @@ function traverse(
         # Check contacts in bvtt1 and add future checks in bvtt2; only sprout self-checks before
         # second-to-last level as leaf self-checks are pointless
         self_checks = level < bvh.tree.levels - 1
-        num_bvtt = traverse_nodes!(bvh, bvtt1, bvtt2,
-                                   num_bvtt, extra, level,
-                                   self_checks, options)
+        bvtt1, bvtt2, num_bvtt = traverse_nodes!(bvh, bvtt1, bvtt2,
+                                                 num_bvtt, extra, level,
+                                                 self_checks, options)
         num_checks += num_bvtt
 
         # Swap source and destination buffers for next iteration
@@ -97,7 +95,7 @@ function traverse(
 
     # Arrived at final leaf level, now populating contact list
     length(bvtt2) < num_bvtt && resize!(bvtt2, num_bvtt)
-    num_bvtt = traverse_leaves!(bvh, bvtt1, bvtt2, num_bvtt, extra, options)
+    bvtt1, bvtt2, num_bvtt = traverse_leaves!(bvh, bvtt1, bvtt2, num_bvtt, extra, options)
 
     # Return contact list and the other buffer as possible cache
     BVHTraversal(start_level, num_checks, Int(num_bvtt), bvtt2, bvtt1)

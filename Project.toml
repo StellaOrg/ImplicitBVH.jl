@@ -1,7 +1,7 @@
 name = "ImplicitBVH"
 uuid = "932a18dc-bb55-4cd5-bdd6-1368ec9cea29"
 authors = ["Andrei Leonard Nicusan <leonard@evophase.co.uk> and contributors"]
-version = "0.5.4"
+version = "0.6.0"
 
 [deps]
 AcceleratedKernels = "6a4ca0a5-0e36-4168-a932-d9be78d558f1"
@@ -13,7 +13,7 @@ KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [compat]
-AcceleratedKernels = "0.3"
+AcceleratedKernels = "0.4"
 ArgCheck = "2"
 Atomix = "0.1, 1"
 DocStringExtensions = "0.9"

@@ -90,10 +90,8 @@ function traverse(
         backend = get_backend(bvtt1)
         KernelAbstractions.zeros(backend, index_type, Int(bvh1.tree.levels * bvh2.tree.levels))
     else
-        # For CPUs we need a vector of spawned tasks and a contact counter for each task
-        tasks = Vector{Task}(undef, options.num_threads)
-        num_written = Vector{Int}(undef, options.num_threads)
-        (tasks, num_written)
+        # For CPUs we need a contact counter for each task
+        Vector{Int}(undef, options.num_threads)
     end
 
     # Compute node-node contacts while both BVHs are at node levels
@@ -104,8 +102,8 @@ function traverse(
         length(bvtt2) < 4 * num_bvtt && resize!(bvtt2, 4 * num_bvtt)
 
         # Check contacts in bvtt1 and add future checks in bvtt2
-        num_bvtt = traverse_nodes_pair!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra,
-                                        level1, level2, options)
+        bvtt1, bvtt2, num_bvtt = traverse_nodes_pair!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra,
+                                                      level1, level2, options)
         num_checks += num_bvtt
 
         # Swap source and destination buffers for next iteration
@@ -120,8 +118,8 @@ function traverse(
         length(bvtt2) < 2 * num_bvtt && resize!(bvtt2, 2 * num_bvtt)
 
         # Check contacts in bvtt1 and add future checks in bvtt2
-        num_bvtt = traverse_nodes_left!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra,
-                                        level1, level2, options)
+        bvtt1, bvtt2, num_bvtt = traverse_nodes_left!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra,
+                                                      level1, level2, options)
         num_checks += num_bvtt
 
         # Swap source and destination buffers for next iteration
@@ -135,8 +133,8 @@ function traverse(
         length(bvtt2) < 2 * num_bvtt && resize!(bvtt2, 2 * num_bvtt)
 
         # Check contacts in bvtt1 and add future checks in bvtt2
-        num_bvtt = traverse_nodes_right!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra,
-                                         level1, level2, options)
+        bvtt1, bvtt2, num_bvtt = traverse_nodes_right!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra,
+                                                       level1, level2, options)
         num_checks += num_bvtt
 
         # Swap source and destination buffers for next iteration
@@ -151,8 +149,8 @@ function traverse(
         length(bvtt2) < 2 * num_bvtt && resize!(bvtt2, 2 * num_bvtt)
 
         # Check contacts in bvtt1 and add future checks in bvtt2
-        num_bvtt = traverse_nodes_leaves_left!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra,
-                                               level1, level2, options)
+        bvtt1, bvtt2, num_bvtt = traverse_nodes_leaves_left!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra,
+                                                             level1, level2, options)
         num_checks += num_bvtt
 
         # Swap source and destination buffers for next iteration
@@ -167,8 +165,8 @@ function traverse(
         length(bvtt2) < 2 * num_bvtt && resize!(bvtt2, 2 * num_bvtt)
 
         # Check contacts in bvtt1 and add future checks in bvtt2
-        num_bvtt = traverse_nodes_leaves_right!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra,
-                                                level1, level2, options)
+        bvtt1, bvtt2, num_bvtt = traverse_nodes_leaves_right!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra,
+                                                              level1, level2, options)
         num_checks += num_bvtt
 
         # Swap source and destination buffers for next iteration
@@ -182,8 +180,8 @@ function traverse(
         length(bvtt2) < 4 * num_bvtt && resize!(bvtt2, 4 * num_bvtt)
 
         # Check contacts in bvtt1 and add future checks in bvtt2
-        num_bvtt = traverse_nodes_pair!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra,
-                                        level1, level2, options)
+        bvtt1, bvtt2, num_bvtt = traverse_nodes_pair!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra,
+                                                      level1, level2, options)
         num_checks += num_bvtt
 
         # Swap source and destination buffers for next iteration
@@ -194,7 +192,7 @@ function traverse(
 
     # Arrived at final leaf level with both BVHs, now populating contact list
     length(bvtt2) < num_bvtt && resize!(bvtt2, num_bvtt)
-    num_bvtt = traverse_leaves_pair!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra, options)
+    bvtt1, bvtt2, num_bvtt = traverse_leaves_pair!(bvh1, bvh2, bvtt1, bvtt2, num_bvtt, extra, options)
 
     # Return contact list and the other buffer as possible cache
     BVHTraversal(start_level1, start_level2, num_checks, Int(num_bvtt), bvtt2, bvtt1)

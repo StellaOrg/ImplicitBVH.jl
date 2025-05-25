@@ -27,7 +27,7 @@ function traverse_nodes_pair!(bvh1, bvh2, src::AbstractGPUVector, dst::AbstractG
     )
 
     # We need to know how many checks we have written into dst
-    @allowscalar dst_offsets[idst_offsets]
+    src, dst, @allowscalar(dst_offsets[idst_offsets])
 end
 
 
@@ -148,7 +148,7 @@ function traverse_nodes_left!(bvh1, bvh2, src::AbstractGPUVector, dst::AbstractG
     )
 
     # We need to know how many checks we have written into dst
-    @allowscalar dst_offsets[idst_offsets]
+    src, dst, @allowscalar(dst_offsets[idst_offsets])
 end
 
 
@@ -251,7 +251,7 @@ function traverse_nodes_right!(bvh1, bvh2, src::AbstractGPUVector, dst::Abstract
     )
 
     # We need to know how many checks we have written into dst
-    @allowscalar dst_offsets[idst_offsets]
+    src, dst, @allowscalar(dst_offsets[idst_offsets])
 end
 
 
@@ -353,7 +353,7 @@ function traverse_nodes_leaves_left!(bvh1, bvh2, src::AbstractGPUVector, dst::Ab
     )
 
     # We need to know how many checks we have written into dst
-    @allowscalar dst_offsets[idst_offsets]
+    src, dst, @allowscalar(dst_offsets[idst_offsets])
 end
 
 
@@ -457,7 +457,7 @@ function traverse_nodes_leaves_right!(bvh1, bvh2, src::AbstractGPUVector, dst::A
     )
 
     # We need to know how many checks we have written into dst
-    @allowscalar dst_offsets[idst_offsets]
+    src, dst, @allowscalar(dst_offsets[idst_offsets])
 end
 
 
@@ -554,7 +554,7 @@ function traverse_leaves_pair!(bvh1, bvh2, src::AbstractGPUVector, contacts::Abs
     )
 
     # We need to know how many checks we have written into dst
-    @allowscalar dst_offsets[end]
+    src, contacts, @allowscalar(dst_offsets[end])
 end
 
 
