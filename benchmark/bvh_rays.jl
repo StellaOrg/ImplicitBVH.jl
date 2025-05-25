@@ -14,7 +14,7 @@ using BenchmarkTools
 using Profile
 using PProf
 
-using CUDA: CuArray
+# using CUDA: CuArray
 
 
 # Types used
@@ -37,9 +37,9 @@ directions = rand(Float32, 3, num_rays)
 
 
 # For GPU tests
-bounding_spheres = CuArray(bounding_spheres)
-points = CuArray(points)
-directions = CuArray(directions)
+# bounding_spheres = CuArray(bounding_spheres)
+# points = CuArray(points)
+# directions = CuArray(directions)
 
 
 # Pre-compile BVH traversal

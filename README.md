@@ -229,15 +229,16 @@ nodes we need to skip to get to a given node index, following the fantastic idea
 # Performance
 
 As contact detection is one of the most computationally-intensive parts of physical simulation and computer
-vision applications, ~~we spent a stupid amount of time optimising~~ this implementation has been optimised for maximum performance and scalability:
+vision applications, ~~we spent a stupid amount of time optimising~~ this implementation has been optimised for maximum performance and scalability - for example, on the [`xyzrgb_dragon.obj`](https://github.com/alecjacobson/common-3d-test-models/blob/master/data/xyzrgb_dragon.obj):
 
-- Computing bounding volumes is optimised for triangles, e.g. constructing 249,882 `BSphere{Float32}` on a single thread takes 4.47 ms on my Mac M1. The construction itself has zero allocations; all computation can be done in parallel in user code.
-- Building a complete bounding volume hierarchy from the 249,882 triangles of [`xyzrgb_dragon.obj`](https://github.com/alecjacobson/common-3d-test-models/blob/master/data/xyzrgb_dragon.obj) takes 11.83 ms single-threaded. The sorting step is the bottleneck, so multi-threading the Morton encoding and BVH up-building does not significantly improve the runtime; waiting on a multi-threaded sorter.
-  - **Building the BVH on an Nvidia A100 takes 409.58 μs**!
-- Contact detection (`traverse`) of the same 249,882 `BSphere{Float32}` for the triangles (aggregated into `BBox{Float32}` parents) takes 107.25 ms single-threaded on an Intel IceLake 8570 and 37.25 ms with 4 threads, at 72% strong scaling.
-  - **Traversing the BVH on an Nvidia A100 takes 1.14 ms**!
-- Ray-tracing (`traverse_rays`) of 100,000 random rays over the same 249,882 `BSphere{Float32}` for the triangles (aggregated into `BBox{Float32}` parents) takes 671.01 ms single-threaded on an Intel IceLake 8570 and 216.99 ms with 4 threads, at 77% strong scaling.
-  - Ray-tracing on an Nvidia A100 takes 2.00 ms.
+
+| Task                                               | Data Size                                 | Single-thread (Mac M3 Max) | 4 Threads (Mac M3 Max) | CPU Strong Scaling | Nvidia A100 |
+| -------------------------------------------------- | ----------------------------------------- | -------------------------- | ---------------------- | ------------------ | ----------- |
+| Compute bounding volumes (BSphere{Float32})        | 249,882 triangles                         | 3.01 ms                    | 0.92 ms                | 82 %               | —           |
+| Build BVH (sorting step is bottleneck)             | 249,882 triangles                         | 7.11 ms                    | 2.631 ms               | 68 %               | 409.58 μs   |
+| Contact detection (traverse)                       | 249,882 BSpheres aggregated into BBoxes   | 67.14 ms                   | 19.7 ms                | 85 %               | 1.14 ms     |
+| Ray tracing (traverse\_rays) — 100,000 random rays | 100,000 rays over 249,882 BSpheres→BBoxes | 369.7 ms                   | 113.8 ms               | 81 %               | 2.00 ms     |
+
 
 Only fundamental Julia types are used - e.g. `struct`, `Tuple`, `UInt`, `Float64` - which can be straightforwardly inlined, unrolled and fused by the compiler. These types are also straightforward to transpile to accelerators via [`KernelAbstractions.jl`](https://github.com/JuliaGPU/KernelAbstractions.jl) such as `CUDA`, `AMDGPU`, `oneAPI`, `Apple Metal`.
 

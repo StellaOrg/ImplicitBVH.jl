@@ -14,8 +14,6 @@ using BenchmarkTools
 using Profile
 using PProf
 
-using CUDA: CuArray
-
 
 # Types used
 const LeafType = BSphere{Float32}
@@ -30,7 +28,6 @@ display(mesh)
 @show Threads.nthreads()
 
 bounding_spheres = [LeafType(tri) for tri in mesh]
-bounding_spheres = CuArray(bounding_spheres)
 
 # Pre-compile BVH traversal
 bvh = BVH(bounding_spheres, NodeType, MortonType)

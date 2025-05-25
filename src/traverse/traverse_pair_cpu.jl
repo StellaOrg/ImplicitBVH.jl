@@ -1,11 +1,9 @@
 function traverse_nodes_pair!(
-    bvh1, bvh2, src, dst, num_src,
-    cpu_extra::Tuple{Vector, Vector},
+    bvh1, bvh2, src, dst, num_src, num_written,
     level1, level2,
     options,
 )
     # Traverse nodes when level is above leaves for both BVH1 and BVH2
-    tasks, num_written = cpu_extra
 
     # Compute number of virtual elements before this level to skip when computing the memory index
     virtual_nodes_level1 = bvh1.tree.virtual_leaves >> (bvh1.tree.levels - (level1 - 1))
@@ -25,40 +23,44 @@ function traverse_nodes_pair!(
             virtual_nodes_before2,
             1:num_src,
         )
+        return src, dst, num_dst
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 4 dst elements per src element
-        @inbounds for i in 1:tp.num_tasks
-            irange = tp[i]
+        AK.itask_partition(tp) do itask, irange
             istart = irange.start
             iend = irange.stop
-            tasks[i] = Threads.@spawn traverse_nodes_pair_range!(
+            traverse_nodes_pair_range!(
                 bvh1, bvh2,
-                src, view(dst, 4istart - 3:4iend), view(num_written, i),
+                src, view(dst, 4istart - 3:4iend), view(num_written, itask),
                 virtual_nodes_before1,
                 virtual_nodes_before2,
                 irange,
             )
         end
 
-        # As tasks finish sequentially, move the new written contacts into contiguous region
-        num_dst = 0
-        @inbounds for i in 1:tp.num_tasks
-            wait(tasks[i])
-            task_num_written = num_written[i]
+        # Each task may have written fewer contacts than their full allocated region; copy them
+        # back into src (we don't need src anymore) contiguously, in parallel
+        AK.accumulate!(+, view(num_written, 1:tp.num_tasks), init=0, max_tasks=1)
+        num_dst = num_written[tp.num_tasks]
 
-            # Repack written contacts by the second, third thread, etc.
-            if i > 1
-                istart = tp[i].start
-                for j in 1:task_num_written
-                    dst[num_dst + j] = dst[4istart - 3 + j - 1]
-                end
-            end
-            num_dst += task_num_written
+        # Make sure we have enough space in src, it may have been smaller than dst
+        if num_dst > length(src)
+            resize!(src, num_dst)
         end
-    end
 
-    num_dst
+        # Copy written contacts back into src
+        AK.itask_partition(tp) do itask, irange
+            istart = irange.start
+            ifrom_start = 4istart - 3
+            ito_start = itask == 1 ? 1 : num_written[itask - 1] + 1
+            num_elements = num_written[itask] - ito_start + 1
+            copyto!(src, ito_start, dst, ifrom_start, num_elements)
+        end
+
+        # Now results are back in src, return them flipped
+        return dst, src, num_dst
+    end
 end
 
 
@@ -125,13 +127,11 @@ end
 
 
 function traverse_nodes_left!(
-    bvh1, bvh2, src, dst, num_src,
-    cpu_extra::Tuple{Vector, Vector},
+    bvh1, bvh2, src, dst, num_src, num_written,
     level1, level2,
     options,
 )
     # Traverse nodes when BVH2 is already one above leaf-level - i.e. only BVH1 is sprouted further
-    tasks, num_written = cpu_extra
 
     # Compute number of virtual elements before this level to skip when computing the memory index
     virtual_nodes_level1 = bvh1.tree.virtual_leaves >> (bvh1.tree.levels - (level1 - 1))
@@ -151,40 +151,44 @@ function traverse_nodes_left!(
             virtual_nodes_before2,
             1:num_src,
         )
+        return src, dst, num_dst
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 2 dst elements per src element
-        @inbounds for i in 1:tp.num_tasks
-            irange = tp[i]
+        AK.itask_partition(tp) do itask, irange
             istart = irange.start
             iend = irange.stop
-            tasks[i] = Threads.@spawn traverse_nodes_left_range!(
+            traverse_nodes_left_range!(
                 bvh1, bvh2,
-                src, view(dst, 2istart - 1:2iend), view(num_written, i),
+                src, view(dst, 2istart - 1:2iend), view(num_written, itask),
                 virtual_nodes_before1,
                 virtual_nodes_before2,
                 irange,
             )
         end
 
-        # As tasks finish sequentially, move the new written contacts into contiguous region
-        num_dst = 0
-        @inbounds for i in 1:tp.num_tasks
-            wait(tasks[i])
-            task_num_written = num_written[i]
+        # Each task may have written fewer contacts than their full allocated region; copy them
+        # back into src (we don't need src anymore) contiguously, in parallel
+        AK.accumulate!(+, view(num_written, 1:tp.num_tasks), init=0, max_tasks=1)
+        num_dst = num_written[tp.num_tasks]
 
-            # Repack written contacts by the second, third thread, etc.
-            if i > 1
-                istart = tp[i].start
-                for j in 1:task_num_written
-                    dst[num_dst + j] = dst[2istart - 1 + j - 1]
-                end
-            end
-            num_dst += task_num_written
+        # Make sure we have enough space in src, it may have been smaller than dst
+        if num_dst > length(src)
+            resize!(src, num_dst)
         end
-    end
 
-    num_dst
+        # Copy written contacts back into src
+        AK.itask_partition(tp) do itask, irange
+            istart = irange.start
+            ifrom_start = 2istart - 1
+            ito_start = itask == 1 ? 1 : num_written[itask - 1] + 1
+            num_elements = num_written[itask] - ito_start + 1
+            copyto!(src, ito_start, dst, ifrom_start, num_elements)
+        end
+
+        # Now results are back in src, return them flipped
+        return dst, src, num_dst
+    end
 end
 
 
@@ -232,13 +236,11 @@ end
 
 
 function traverse_nodes_right!(
-    bvh1, bvh2, src, dst, num_src,
-    cpu_extra::Tuple{Vector, Vector},
+    bvh1, bvh2, src, dst, num_src, num_written,
     level1, level2,
     options,
 )
     # Traverse nodes when BVH2 is already one above leaf-level - i.e. only BVH1 is sprouted further
-    tasks, num_written = cpu_extra
 
     # Compute number of virtual elements before this level to skip when computing the memory index
     virtual_nodes_level1 = bvh1.tree.virtual_leaves >> (bvh1.tree.levels - (level1 - 1))
@@ -258,40 +260,44 @@ function traverse_nodes_right!(
             virtual_nodes_before2,
             1:num_src,
         )
+        return src, dst, num_dst
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 2 dst elements per src element
-        @inbounds for i in 1:tp.num_tasks
-            irange = tp[i]
+        AK.itask_partition(tp) do itask, irange
             istart = irange.start
             iend = irange.stop
-            tasks[i] = Threads.@spawn traverse_nodes_right_range!(
+            traverse_nodes_right_range!(
                 bvh1, bvh2,
-                src, view(dst, 2istart - 1:2iend), view(num_written, i),
+                src, view(dst, 2istart - 1:2iend), view(num_written, itask),
                 virtual_nodes_before1,
                 virtual_nodes_before2,
                 irange,
             )
         end
 
-        # As tasks finish sequentially, move the new written contacts into contiguous region
-        num_dst = 0
-        @inbounds for i in 1:tp.num_tasks
-            wait(tasks[i])
-            task_num_written = num_written[i]
+        # Each task may have written fewer contacts than their full allocated region; copy them
+        # back into src (we don't need src anymore) contiguously, in parallel
+        AK.accumulate!(+, view(num_written, 1:tp.num_tasks), init=0, max_tasks=1)
+        num_dst = num_written[tp.num_tasks]
 
-            # Repack written contacts by the second, third thread, etc.
-            if i > 1
-                istart = tp[i].start
-                for j in 1:task_num_written
-                    dst[num_dst + j] = dst[2istart - 1 + j - 1]
-                end
-            end
-            num_dst += task_num_written
+        # Make sure we have enough space in src, it may have been smaller than dst
+        if num_dst > length(src)
+            resize!(src, num_dst)
         end
-    end
 
-    num_dst
+        # Copy written contacts back into src
+        AK.itask_partition(tp) do itask, irange
+            istart = irange.start
+            ifrom_start = 2istart - 1
+            ito_start = itask == 1 ? 1 : num_written[itask - 1] + 1
+            num_elements = num_written[itask] - ito_start + 1
+            copyto!(src, ito_start, dst, ifrom_start, num_elements)
+        end
+
+        # Now results are back in src, return them flipped
+        return dst, src, num_dst
+    end
 end
 
 
@@ -339,13 +345,11 @@ end
 
 
 function traverse_nodes_leaves_left!(
-    bvh1, bvh2, src, dst, num_src,
-    cpu_extra::Tuple{Vector, Vector},
+    bvh1, bvh2, src, dst, num_src, num_written,
     level1, level2,
     options,
 )
     # Special case: BVH2 is at leaf level; only BVH1 is sprouted further with node-leaf checks
-    tasks, num_written = cpu_extra
 
     # Compute number of virtual elements before this level to skip when computing the memory index
     virtual_nodes_level1 = bvh1.tree.virtual_leaves >> (bvh1.tree.levels - (level1 - 1))
@@ -361,39 +365,43 @@ function traverse_nodes_leaves_left!(
             virtual_nodes_before1,
             1:num_src,
         )
+        return src, dst, num_dst
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 2 dst elements per src element
-        @inbounds for i in 1:tp.num_tasks
-            irange = tp[i]
+        AK.itask_partition(tp) do itask, irange
             istart = irange.start
             iend = irange.stop
-            tasks[i] = Threads.@spawn traverse_nodes_leaves_left_range!(
+            traverse_nodes_leaves_left_range!(
                 bvh1, bvh2,
-                src, view(dst, 2istart - 1:2iend), view(num_written, i),
+                src, view(dst, 2istart - 1:2iend), view(num_written, itask),
                 virtual_nodes_before1,
                 irange,
             )
         end
 
-        # As tasks finish sequentially, move the new written contacts into contiguous region
-        num_dst = 0
-        @inbounds for i in 1:tp.num_tasks
-            wait(tasks[i])
-            task_num_written = num_written[i]
+        # Each task may have written fewer contacts than their full allocated region; copy them
+        # back into src (we don't need src anymore) contiguously, in parallel
+        AK.accumulate!(+, view(num_written, 1:tp.num_tasks), init=0, max_tasks=1)
+        num_dst = num_written[tp.num_tasks]
 
-            # Repack written contacts by the second, third thread, etc.
-            if i > 1
-                istart = tp[i].start
-                for j in 1:task_num_written
-                    dst[num_dst + j] = dst[2istart - 1 + j - 1]
-                end
-            end
-            num_dst += task_num_written
+        # Make sure we have enough space in src, it may have been smaller than dst
+        if num_dst > length(src)
+            resize!(src, num_dst)
         end
-    end
 
-    num_dst
+        # Copy written contacts back into src
+        AK.itask_partition(tp) do itask, irange
+            istart = irange.start
+            ifrom_start = 2istart - 1
+            ito_start = itask == 1 ? 1 : num_written[itask - 1] + 1
+            num_elements = num_written[itask] - ito_start + 1
+            copyto!(src, ito_start, dst, ifrom_start, num_elements)
+        end
+
+        # Now results are back in src, return them flipped
+        return dst, src, num_dst
+    end
 end
 
 
@@ -446,13 +454,11 @@ end
 
 
 function traverse_nodes_leaves_right!(
-    bvh1, bvh2, src, dst, num_src,
-    cpu_extra::Tuple{Vector, Vector},
+    bvh1, bvh2, src, dst, num_src, num_written,
     level1, level2,
     options,
 )
     # Special case: BVH1 is at leaf level; only BVH2 is sprouted further with node-leaf checks
-    tasks, num_written = cpu_extra
 
     # Compute number of virtual elements before this level to skip when computing the memory index
     virtual_nodes_level2 = bvh2.tree.virtual_leaves >> (bvh2.tree.levels - (level2 - 1))
@@ -468,39 +474,43 @@ function traverse_nodes_leaves_right!(
             virtual_nodes_before2,
             1:num_src,
         )
+        return src, dst, num_dst
     else
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 2 dst elements per src element
-        @inbounds for i in 1:tp.num_tasks
-            irange = tp[i]
+        AK.itask_partition(tp) do itask, irange
             istart = irange.start
             iend = irange.stop
-            tasks[i] = Threads.@spawn traverse_nodes_leaves_right_range!(
+            traverse_nodes_leaves_right_range!(
                 bvh1, bvh2,
-                src, view(dst, 2istart - 1:2iend), view(num_written, i),
+                src, view(dst, 2istart - 1:2iend), view(num_written, itask),
                 virtual_nodes_before2,
                 irange,
             )
         end
 
-        # As tasks finish sequentially, move the new written contacts into contiguous region
-        num_dst = 0
-        @inbounds for i in 1:tp.num_tasks
-            wait(tasks[i])
-            task_num_written = num_written[i]
+        # Each task may have written fewer contacts than their full allocated region; copy them
+        # back into src (we don't need src anymore) contiguously, in parallel
+        AK.accumulate!(+, view(num_written, 1:tp.num_tasks), init=0, max_tasks=1)
+        num_dst = num_written[tp.num_tasks]
 
-            # Repack written contacts by the second, third thread, etc.
-            if i > 1
-                istart = tp[i].start
-                for j in 1:task_num_written
-                    dst[num_dst + j] = dst[2istart - 1 + j - 1]
-                end
-            end
-            num_dst += task_num_written
+        # Make sure we have enough space in src, it may have been smaller than dst
+        if num_dst > length(src)
+            resize!(src, num_dst)
         end
-    end
 
-    num_dst
+        # Copy written contacts back into src
+        AK.itask_partition(tp) do itask, irange
+            istart = irange.start
+            ifrom_start = 2istart - 1
+            ito_start = itask == 1 ? 1 : num_written[itask - 1] + 1
+            num_elements = num_written[itask] - ito_start + 1
+            copyto!(src, ito_start, dst, ifrom_start, num_elements)
+        end
+
+        # Now results are back in src, return them flipped
+        return dst, src, num_dst
+    end
 end
 
 
@@ -553,12 +563,10 @@ end
 
 
 function traverse_leaves_pair!(
-    bvh1, bvh2, src, contacts, num_src,
-    cpu_extra::Tuple{Vector, Vector},
+    bvh1, bvh2, src, contacts, num_src, num_written,
     options,
 )
     # Traverse final level, only doing leaf-leaf checks
-    tasks, num_written = cpu_extra
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
     # is needed, inline call
@@ -569,37 +577,39 @@ function traverse_leaves_pair!(
             src, view(contacts, :), nothing,
             1:num_src,
         )
+        return src, contacts, num_contacts
     else
         num_contacts = 0
 
         # Keep track of tasks launched and number of elements written by each task in their unique
         # memory region. The unique region is equal to 1 dst elements per src element
-        @inbounds for i in 1:tp.num_tasks
-            irange = tp[i]
+        AK.itask_partition(tp) do itask, irange
             istart = irange.start
             iend = irange.stop
-            tasks[i] = Threads.@spawn traverse_leaves_pair_range!(
+            traverse_leaves_pair_range!(
                 bvh1, bvh2,
-                src, view(contacts, istart:iend), view(num_written, i),
+                src, view(contacts, istart:iend), view(num_written, itask),
                 irange,
             )
         end
-        @inbounds for i in 1:tp.num_tasks
-            wait(tasks[i])
-            task_num_written = num_written[i]
 
-            # Repack written contacts by the second, third thread, etc.
-            if i > 1
-                istart = tp[i].start
-                for j in 1:task_num_written
-                    contacts[num_contacts + j] = contacts[istart + j - 1]
-                end
-            end
-            num_contacts += task_num_written
+        # Each task may have written fewer contacts than their full allocated region; copy them
+        # back into src (we don't need src anymore) contiguously, in parallel
+        AK.accumulate!(+, view(num_written, 1:tp.num_tasks), init=0, max_tasks=1)
+        num_contacts = num_written[tp.num_tasks]
+
+        # Copy written contacts back into src
+        AK.itask_partition(tp) do itask, irange
+            istart = irange.start
+            ifrom_start = istart
+            ito_start = itask == 1 ? 1 : num_written[itask - 1] + 1
+            num_elements = num_written[itask] - ito_start + 1
+            copyto!(src, ito_start, contacts, ifrom_start, num_elements)
         end
-    end
 
-    num_contacts
+        # Now results are back in src, return them flipped
+        return contacts, src, num_contacts
+    end
 end
 
 

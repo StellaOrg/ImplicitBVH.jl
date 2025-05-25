@@ -21,7 +21,7 @@ function traverse_nodes!(bvh, src::AbstractGPUVector, dst::AbstractGPUVector,
     )
 
     # We need to know how many checks we have written into dst
-    @allowscalar dst_offsets[level]
+    src, dst, @allowscalar(dst_offsets[level])
 end
 
 
@@ -143,7 +143,7 @@ function traverse_leaves!(bvh, src::AbstractGPUVector, contacts::AbstractGPUVect
     )
 
     # We need to know how many pairs we have written into contacts
-    @allowscalar dst_offsets[end]
+    src, contacts, @allowscalar(dst_offsets[end])
 end
 
 

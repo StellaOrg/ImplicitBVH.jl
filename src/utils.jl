@@ -7,9 +7,6 @@ settings.
 An exemplar of an index (e.g. `Int32(0)`) is used to deduce the types of indices used in the BVH
 building ([`ImplicitTree`](@ref), order) and traversal ([`IndexPair`](@ref)).
 
-The CPU scheduler can be `:threads` (for base Julia threads) or `:polyester` (for Polyester.jl
-threads).
-
 If `compute_extrema=false` and `mins` / `maxs` are defined, they will not be computed from the
 distribution of bounding volumes; useful if you have a fixed simulation box, for example. You
 **must** ensure that no bounding volume centers will touch or be outside these bounds, otherwise
@@ -22,9 +19,9 @@ logically incorrect results will be silently produced.
         index_exemplar::I               = Int32(0),
 
         # CPU threading
-        scheduler::Symbol               = :threads,
         num_threads::Int                = Threads.nthreads(),
         min_mortons_per_thread::Int     = 1000,
+        min_sorts_per_thread::Int       = 1000,
         min_boundings_per_thread::Int   = 1000,
         min_traversals_per_thread::Int  = 1000,
 
@@ -47,9 +44,9 @@ struct BVHOptions{I <: Integer, T}
     index_exemplar::I
 
     # CPU threading
-    scheduler::Symbol
     num_threads::Int
     min_mortons_per_thread::Int
+    min_sorts_per_thread::Int
     min_boundings_per_thread::Int
     min_traversals_per_thread::Int
 
@@ -69,9 +66,9 @@ function BVHOptions(;
     index_exemplar::I               = Int32(0),
 
     # CPU threading
-    scheduler::Symbol               = :threads,
     num_threads::Int                = Threads.nthreads(),
     min_mortons_per_thread::Int     = 1000,
+    min_sorts_per_thread::Int       = 1000,
     min_boundings_per_thread::Int   = 1000,
     min_traversals_per_thread::Int  = 1000,
 
@@ -87,6 +84,7 @@ function BVHOptions(;
     # Correctness checks
     @argcheck num_threads > 0
     @argcheck min_mortons_per_thread > 0
+    @argcheck min_sorts_per_thread > 0
     @argcheck min_boundings_per_thread > 0
     @argcheck min_traversals_per_thread > 0
     @argcheck block_size > 0
@@ -99,9 +97,9 @@ function BVHOptions(;
 
     BVHOptions(
         index_exemplar,
-        scheduler,
         num_threads,
         min_mortons_per_thread,
+        min_sorts_per_thread,
         min_boundings_per_thread,
         min_traversals_per_thread,
         block_size,
