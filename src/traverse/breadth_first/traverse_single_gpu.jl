@@ -123,7 +123,7 @@ end
 
 
 function traverse_leaves!(bvh, src::AbstractGPUVector, contacts::AbstractGPUVector,
-                          num_src, dst_offsets, options)
+                          num_src, dst_offsets, narrow, options)
     # Traverse final level, only doing leaf-leaf checks
     I = get_index_type(options)
 
@@ -136,9 +136,10 @@ function traverse_leaves!(bvh, src::AbstractGPUVector, contacts::AbstractGPUVect
 
     kernel! = _traverse_leaves_gpu!(backend, block_size)
     kernel!(
-        bvh.leaves, bvh.order,
+        bvh.leaves,
         src, contacts,
         I(num_src), dst_offsets, I(num_skips),
+        narrow,
         ndrange=num_blocks * block_size,
     )
 
@@ -150,10 +151,11 @@ end
 
 
 @kernel cpu=false inbounds=true unsafe_indices=true function _traverse_leaves_gpu!(
-    @Const(leaves), @Const(order),
+    @Const(leaves),
     @Const(src), dst,
     num_src, dst_offsets,
     num_skips,
+    narrow,
 )
     # Group (block) and local (thread) indices
     iblock = @index(Group, Linear)
@@ -178,20 +180,17 @@ end
 
         # Extract implicit indices of BVH leaves to test
         implicit1, implicit2 = src[index]
-
-        iorder1 = order[implicit1 - num_skips]
-        iorder2 = order[implicit2 - num_skips]
-
-        leaf1 = leaves[iorder1]
-        leaf2 = leaves[iorder2]
+        leaf1 = leaves[implicit1 - num_skips]
+        leaf2 = leaves[implicit2 - num_skips]
 
         # If two leaves are touching, save in contacts
-        if iscontact(leaf1, leaf2)
-
-            # While it's guaranteed that implicit1 < implicit2, the bvh.order may not be
-            # ascending, so we add this comparison to output ordered contact indices
+        if iscontact(leaf1.volume, leaf2.volume) && narrow(leaf1, leaf2)
             new_temp_offset = @atomic temp_offset[0x1] += 0x1
-            temp[new_temp_offset - 0x1 + 0x1] = iorder1 < iorder2 ? (iorder1, iorder2) : (iorder2, iorder1)
+            temp[new_temp_offset - 0x1 + 0x1] = if leaf1.index > leaf2.index
+                (leaf2.index, leaf1.index)
+            else
+                (leaf1.index, leaf2.index)
+            end
         end
     end
     @synchronize()

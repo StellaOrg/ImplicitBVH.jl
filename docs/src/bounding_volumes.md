@@ -1,6 +1,7 @@
 # Bounding Volumes
 
 ```@docs
+ImplicitBVH.BoundingVolume
 ImplicitBVH.BBox
 ImplicitBVH.BSphere
 ```

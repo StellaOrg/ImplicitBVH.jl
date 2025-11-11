@@ -1,49 +1,8 @@
-"""
-    traverse(
-        bvh::BVH,
-        start_level::Int=default_start_level(bvh),
-        cache::Union{Nothing, BVHTraversal}=nothing;
-        options=BVHOptions(),
-    )::BVHTraversal
-
-Traverse `bvh` downwards from `start_level`, returning all contacting bounding volume leaves. The
-returned [`BVHTraversal`](@ref) also contains two contact buffers that can be reused on future
-traversals.
-
-# Examples
-
-```jldoctest
-using ImplicitBVH
-using ImplicitBVH: BBox, BSphere
-
-# Generate some simple bounding spheres
-bounding_spheres = [
-    BSphere{Float32}([0., 0., 0.], 0.5),
-    BSphere{Float32}([0., 0., 1.], 0.6),
-    BSphere{Float32}([0., 0., 2.], 0.5),
-    BSphere{Float32}([0., 0., 3.], 0.4),
-    BSphere{Float32}([0., 0., 4.], 0.6),
-]
-
-# Build BVH
-bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
-
-# Traverse BVH for contact detection
-traversal = traverse(bvh, 2)
-
-# Reuse traversal buffers for future contact detection - possibly with different BVHs
-traversal = traverse(bvh, 2, traversal)
-@show traversal.contacts;
-;
-
-# output
-traversal.contacts = Tuple{Int32, Int32}[(1, 2), (2, 3), (4, 5)]
-```
-"""
 function traverse(
-    bvh::BVH,
-    start_level::Int=default_start_level(bvh),
-    cache::Union{Nothing, BVHTraversal}=nothing;
+    bvh::BVH, alg::BFSTraversal;
+    start_level::Int=default_start_level(bvh, alg),
+    cache::Union{Nothing, BVHTraversal}=nothing,
+    narrow=(bv1, bv2) -> true,
     options=BVHOptions(),
 )
     # Correctness checks
@@ -95,7 +54,7 @@ function traverse(
 
     # Arrived at final leaf level, now populating contact list
     length(bvtt2) < num_bvtt && resize!(bvtt2, num_bvtt)
-    bvtt1, bvtt2, num_bvtt = traverse_leaves!(bvh, bvtt1, bvtt2, num_bvtt, extra, options)
+    bvtt1, bvtt2, num_bvtt = traverse_leaves!(bvh, bvtt1, bvtt2, num_bvtt, extra, narrow, options)
 
     # Return contact list and the other buffer as possible cache
     BVHTraversal(start_level, num_checks, Int(num_bvtt), bvtt2, bvtt1)

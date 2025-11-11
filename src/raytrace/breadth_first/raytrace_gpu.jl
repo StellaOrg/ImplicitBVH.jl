@@ -98,7 +98,8 @@ end
 function traverse_rays_leaves!(
     bvh, points, directions, 
     src::AbstractGPUVector, intersections::AbstractGPUVector,
-    num_src, dst_offsets, options
+    num_src, dst_offsets::AbstractGPUVector,
+    narrow, options
 )
     # Traverse final level, only doing ray-leaf checks
     I = get_index_type(options)
@@ -110,9 +111,9 @@ function traverse_rays_leaves!(
 
     kernel! = _traverse_rays_leaves_gpu!(backend, block_size)
     kernel!(
-        bvh.leaves, bvh.order, points, directions,
+        bvh.leaves, points, directions,
         src, intersections, I(num_src), dst_offsets,
-        I(num_above),
+        I(num_above), narrow,
         ndrange=num_blocks * block_size,
     )
 
@@ -122,9 +123,9 @@ end
 
 
 @kernel cpu=false inbounds=true unsafe_indices=true function _traverse_rays_leaves_gpu!(
-    leaves, order, points, directions,
+    leaves, points, directions,
     src, dst, num_src, dst_offsets,
-    num_above,
+    num_above, narrow,
 )
     # Group (block) and local (thread) indices
     iblock = @index(Group, Linear)
@@ -150,16 +151,14 @@ end
 
         # Extract implicit indices of BVH leaves to test
         implicit, iray = src[index]
-        iorder = order[implicit - num_above]
-
-        leaf = leaves[iorder]
+        leaf = leaves[implicit - num_above]
         p = @view points[:, iray]
         d = @view directions[:, iray]
 
         # If leaf-ray intersects save the intersection
-        if isintersection(leaf, p, d)
+        if isintersection(leaf.volume, p, d) && narrow(leaf, p, d)
             new_temp_offset = @atomic temp_offset[0x1] += 0x1
-            temp[new_temp_offset - 0x1 + 0x1] = (iorder, iray)
+            temp[new_temp_offset - 0x1 + 0x1] = (leaf.index, iray)
         end
     end
     @synchronize()
