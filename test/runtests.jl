@@ -9,7 +9,8 @@ using Aqua
 
 
 @testset "Aqua" begin
-    Aqua.test_all(ImplicitBVH)
+    # https://github.com/JuliaTesting/Aqua.jl/issues/86 affects SimpleMVector
+    Aqua.test_all(ImplicitBVH, unbound_args=false)
 end
 
 
