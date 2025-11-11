@@ -2,8 +2,8 @@
 
 
 ```@docs
-ImplicitBVH.MortonUnsigned
-ImplicitBVH.morton_encode
+ImplicitBVH.MortonAlgorithm
+ImplicitBVH.DefaultMortonAlgorithm
 ImplicitBVH.morton_encode!
 ImplicitBVH.morton_encode_single
 ImplicitBVH.morton_scaling

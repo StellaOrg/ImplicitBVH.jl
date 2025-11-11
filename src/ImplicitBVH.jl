@@ -9,12 +9,15 @@ module ImplicitBVH
 # Functionality exported by this package by default
 export BVH, BVHTraversal, BVHOptions, traverse,  traverse_rays, default_start_level
 export ImplicitTree, memory_index, level_indices, isvirtual
+export DefaultMortonAlgorithm
+export BFSTraversal, LVTTraversal
 
 
 # Internal dependencies
 using LinearAlgebra
 using DocStringExtensions
 
+import Adapt
 using ArgCheck
 using KernelAbstractions
 using Atomix: @atomic
@@ -24,9 +27,9 @@ import AcceleratedKernels as AK
 
 
 include("utils.jl")
-include("morton.jl")
-include("implicit_tree.jl")
 include("bounding_volumes/bounding_volumes.jl")
+include("implicit_tree.jl")
+include("morton/morton.jl")
 include("build.jl")
 include("traverse/traverse.jl")
 include("raytrace/raytrace.jl")

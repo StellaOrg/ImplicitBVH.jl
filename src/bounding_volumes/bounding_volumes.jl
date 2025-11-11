@@ -10,47 +10,20 @@ function iscontact end
 
 
 """
-    isintersection(b::BBox, p::AbstractVector, d::AbstractVector)
-    isintersection(s::BSphere, p::AbstractVector, d::AbstractVector)
+    isintersection(
+        b::BBox{T},
+        p::Union{AbstractVector{T}, NTuple{3, T}},
+        d::Union{AbstractVector{T}, NTuple{3, T}},
+    ) where T
+
+    isintersection(
+        s::BSphere{T},
+        p::Union{AbstractVector{T}, NTuple{3, T}},
+        d::Union{AbstractVector{T}, NTuple{3, T}},
+    ) where T
 
 Check if a forward ray, defined by a point `p` and a direction `d` intersects a bounding volume;
 `p` and `d` can be any iterables with 3 numbers (e.g. `Vector{Float64}`).
-
-# Examples
-Simple ray bounding box intersection example:
-
-```jldoctest
-using ImplicitBVH
-using ImplicitBVH: BSphere, BBox, isintersection
-
-# Generate a simple bounding box
-bounding_box = BBox((0., 0., 0.), (1., 1., 1.))
-
-# Generate a ray passing up and through the bottom face of the bounding box
-point = [.5, .5, -10]
-direction = [0, 0, 1]
-isintersection(bounding_box, point, direction)
-
-# output
-true
-```
-
-Simple ray bounding sphere intersection example:
-```jldoctest
-using ImplicitBVH
-using ImplicitBVH: BSphere, BBox, isintersection
-
-# Generate a simple bounding sphere
-bounding_sphere = BSphere((0., 0., 0.), 0.5)
-
-# Generate a ray passing up and through the bounding sphere
-point = [0, 0, -10]
-direction = [0, 0, 1]
-isintersection(bounding_sphere, point, direction)
-
-# output
-true
-```
 """
 function isintersection end
 
@@ -62,6 +35,39 @@ function isintersection end
 Get the coordinates of a bounding volume's centre, as a NTuple{3, T}.
 """
 function center end
+
+
+"""
+    $(TYPEDEF)
+
+Bounding volume wrapper, containing a bounding volume of type `V`, an index of type `I`,
+and a computed Morton code of type `M`.
+
+The index will be the one reported in case of contact during traversal; it can be anything
+(user-defined) to identify the bounding volume later in e.g. a simulation.
+
+# Fields
+- `volume::V`: the bounding volume, e.g. `BSphere` or `BBox`.
+- `index::I`: the user-defined index associated with this bounding volume.
+- `morton::M`: the Morton code for this bounding volume computed during BVH construction.
+
+"""
+struct BoundingVolume{V, I, M}
+    volume::V
+    index::I
+    morton::M
+end
+
+Base.eltype(b::BoundingVolume) = eltype(b.volume)
+Base.eltype(::Type{BoundingVolume{V, I, M}}) where {V, I, M} = eltype(V)
+
+
+function same_leaf_node(
+    leaves::AbstractVector{<:BoundingVolume{V, I, M}},
+    nodes::AbstractVector{N}    
+) where {V, I, M, N}
+    V === N
+end
 
 
 # Sub-includes

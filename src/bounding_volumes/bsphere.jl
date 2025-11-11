@@ -1,7 +1,7 @@
 """
     $(TYPEDEF)
 
-Bounding sphere, highly optimised for computing bounding volumes for triangles and merging into
+Bounding sphere, optimised for computing bounding volumes for triangles and merging into
 larger bounding volumes.
 
 # Methods
@@ -35,6 +35,8 @@ Base.eltype(::Type{BSphere{T}}) where T = T
 # Convenience constructors, with and without type parameter
 BSphere{T}(x::AbstractVector, r) where T = BSphere(NTuple{3, T}(x), T(r))
 BSphere(x::AbstractVector, r) = BSphere{eltype(x)}(x, r)
+BSphere{T}(x::BSphere) where T = BSphere{T}(x.x, x.r)
+BSphere(x::BSphere{T}) where T = BSphere{T}(x)
 
 
 # Constructors from triangles

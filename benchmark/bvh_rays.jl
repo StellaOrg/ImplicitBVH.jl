@@ -18,9 +18,11 @@ using PProf
 
 
 # Types used
-const LeafType = BSphere{Float32}
-const NodeType = BBox{Float32}
+const FloatType = Float32
+const LeafType = BSphere{FloatType}
+const NodeType = BBox{FloatType}
 const MortonType = UInt32
+const IndexType = Int32
 
 
 # Load mesh and compute bounding spheres for each triangle. Can download mesh from:
@@ -32,8 +34,8 @@ display(mesh)
 bounding_spheres = [LeafType(tri) for tri in mesh]
 
 num_rays = 100_000
-points = rand(Float32, 3, num_rays)
-directions = rand(Float32, 3, num_rays)
+points = rand(FloatType, 3, num_rays)
+directions = rand(FloatType, 3, num_rays)
 
 
 # For GPU tests
@@ -43,26 +45,24 @@ directions = rand(Float32, 3, num_rays)
 
 
 # Pre-compile BVH traversal
-bvh = BVH(bounding_spheres, NodeType, MortonType)
+options = BVHOptions(index=IndexType, morton=DefaultMortonAlgorithm(MortonType))
+bvh = BVH(bounding_spheres, NodeType, options=options)
 @show traversal = traverse_rays(bvh, points, directions)
 
 
-# # Benchmark BVH traversal anew
-# println("BVH traversal with dynamic buffer resizing:")
-# display(@benchmark(traverse_rays(bvh, points, directions), samples=100))
-
-# Benchmark BVH creation reusing previous cache
-println("BVH traversal without dynamic buffer resizing:")
-display(@benchmark(traverse_rays(bvh, points, directions, 1, traversal), samples=100))
+# Benchmark BVH ray-tracing
+for alg in (LVTTraversal(), BFSTraversal())
+    println("BVH traversal with $alg:")
+    display(@benchmark traverse_rays(bvh, points, directions, $alg))
+    println()
+end
 
 
 
 # # Collect a pprof profile of the complete build
 # Profile.clear()
 # @profile begin
-#     for _ in 1:1000
-#         check_intersections!(intersections, bvs, points, directions)
-#     end
+#     traverse_rays(bvh, points, directions)
 # end
 # 
 # 

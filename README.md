@@ -5,17 +5,16 @@
 [![Docs Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/stable)
 [![Docs Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://stellaorg.github.io/ImplicitBVH.jl/dev)
 [![Build Status](https://github.com/StellaOrg/ImplicitBVH.jl/workflows/CI/badge.svg)](https://github.com/StellaOrg/ImplicitBVH.jl/actions/workflows/ci.yml)
+[![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
 
 # ImplicitBVH.jl
 *High-Performance Cross-Architecture Bounding Volume Hierarchy for Collision Detection and Ray Tracing*
 
-**New in v0.5.0: Ray Tracing and GPU acceleration via [AcceleratedKernels.jl](https://github.com/anicusan/AcceleratedKernels.jl)/[KernelAbstractions.jl](https://github.com/JuliaGPU/KernelAbstractions.jl) targeting all JuliaGPU backends, i.e. Nvidia CUDA, AMD ROCm, Intel oneAPI, Apple Metal.**
-
 It uses an implicit bounding volume hierarchy constructed from an iterable of some geometric
 primitives' (e.g. triangles in a mesh) bounding volumes forming the `ImplicitTree` leaves. The leaves
-and merged nodes above them can have different types - e.g. `BSphere{Float64}` leaves merged into
-larger `BBox{Float64}`.
+and merged nodes above them can have different types - e.g. `BSphere{Float32}` leaves merged into
+larger `BBox{Float32}`.
 
 The initial geometric primitives are sorted according to their Morton-encoded coordinates; the
 unsigned integer type used for the Morton encoding can be chosen between `UInt16`, `UInt32` and `UInt64`.
@@ -51,11 +50,11 @@ traversal = traverse(bvh)
 @show traversal.contacts
 
 # output
-traversal.contacts = [(1, 2), (2, 3), (4, 5)]
+traversal.contacts = Tuple{Int32, Int32}[(1, 2), (2, 3), (4, 5)]
 ```
 
-Using `Float32` bounding spheres for leaves, `Float32` bounding boxes for nodes above, and `UInt32`
-Morton codes:
+Using `Float32` bounding spheres for leaves, `Float32` bounding boxes for nodes above, `UInt32`
+Morton codes and `Int32` indices:
 
 ```julia
 using ImplicitBVH
@@ -71,29 +70,28 @@ bounding_spheres = [
 ]
 
 # Build BVH
-bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
+options = BVHOptions(index=Int32, morton=DefaultMortonAlgorithm(UInt32))
+bvh = BVH(bounding_spheres, BBox{Float32}, options=options)
 
 # Traverse BVH for contact detection
-traversal = traverse(bvh)
+traversal = traverse(bvh, options=options)
 @show traversal.contacts
 
 # output
 traversal.contacts = [(1, 2), (2, 3), (4, 5)]
 ```
 
-Build BVH up to level 2 and start traversing down from level 3, reusing the previous traversal
-cache:
-
-```julia
-bvh = BVH(bounding_spheres, BBox{Float32}, UInt32, 2)
-traversal = traverse(bvh, 3, traversal)
-```
-
 Update previous BVH bounding volumes' positions and rebuild BVH *reusing previous memory*:
 
 ```julia
-new_positions = rand(3, 5)
-bvh_rebuilt = BVH(bvh, new_positions)
+# Use different numbers of threads (on CPUs) and block size (on GPUs)
+options = BVHOptions(num_threads=16, block_size=512)
+
+# ...update bvh.leaves positions in-place, then...
+bvh = BVH(bvh.leaves, BBox{Float32}, cache=bvh, options=options)
+
+# Reuse previous traversal cache memory
+traversal = traverse(bvh, LVTTraversal(), cache=traversal)
 ```
 
 Compute contacts between two different BVH trees (e.g. two different robotic parts):
@@ -115,18 +113,11 @@ bounding_spheres2 = [
 ]
 
 # Build BVHs using bounding boxes for nodes
-bvh1 = BVH(bounding_spheres1, BBox{Float32}, UInt32)
-bvh2 = BVH(bounding_spheres2, BBox{Float32}, UInt32)
+bvh1 = BVH(bounding_spheres1, BBox{Float32})
+bvh2 = BVH(bounding_spheres2, BBox{Float32})
 
 # Traverse BVH for contact detection
-traversal = traverse(
-    bvh1,
-    bvh2,
-    default_start_level(bvh1),
-    default_start_level(bvh2),
-    # previous_traversal_cache,
-    # options=BVHOptions(),
-)
+traversal = traverse(bvh1, bvh2)
 ```
 
 Check out the `benchmark` folder for an example traversing an STL model.
@@ -153,7 +144,7 @@ bounding_spheres = ROCArray([
 ])
 
 # Build BVH
-bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
+bvh = BVH(bounding_spheres, BBox{Float32})
 
 # Traverse BVH for contact detection
 traversal = traverse(bvh)
@@ -179,7 +170,7 @@ mesh = load("xyzrgb_dragon.obj")
 bounding_spheres = [BSphere{Float32}(tri) for tri in mesh]
 
 # Build BVH
-bvh = BVH(bounding_spheres, BBox{Float32}, UInt32)
+bvh = BVH(bounding_spheres, BBox{Float32})
 
 # Generate some rays
 points = rand(Float32, 3, 1000)

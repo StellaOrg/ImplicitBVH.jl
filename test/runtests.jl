@@ -5,6 +5,13 @@ using Test
 using Random
 using LinearAlgebra
 
+using Aqua
+
+
+@testset "Aqua" begin
+    Aqua.test_all(ImplicitBVH)
+end
+
 
 @testset "test_utilities" begin
 
@@ -27,6 +34,87 @@ using LinearAlgebra
         @test dot3(x, y) ≈ dot(x, y)
         @test dist3sq(x, y) ≈ dot(x .- y, x .- y)
         @test dist3(x, y) ≈ sqrt(dot(x .- y, x .- y))
+    end
+end
+
+
+@testset "test_SimpleMVector" begin
+    using ImplicitBVH: SimpleMVector
+
+    v = SimpleMVector{3, Float64}(undef)
+
+    v[1] = 1.5
+    v[2] = 2.5
+    v[3] = 3.5
+
+    @test v[1] == 1.5
+    @test v[2] == 2.5
+    @test v[3] == 3.5
+end
+
+
+@testset "test_k2ij_inclusive" begin
+
+    Random.seed!(42)
+
+    function test_inclusive(n)
+        kmax = n * (n + 0x1) ÷ 0x2
+        v = Vector{Tuple{Int, Int}}(undef, kmax)
+        for k in 0x1:kmax
+            v[k] = ImplicitBVH._k2ij_inclusive(n, k - 0x1)
+        end
+
+        # Test that pairs are generated in the correct order
+        iv = 1
+        for i in 0x0:n - 0x1
+            for j in i:n - 0x1
+                v[iv] == (i, j) || return false
+                iv += 1
+            end
+        end
+
+        return true
+    end
+
+    for n in 1:100:5000
+        @test test_inclusive(n)
+    end
+
+    for n in Int32(1):Int32(100):Int32(5000)
+        @test test_inclusive(n)
+    end
+end
+
+
+@testset "test_k2ij_exclusive" begin
+
+    Random.seed!(42)
+
+    function test_exclusive(n)
+        kmax = n * (n - 0x1) ÷ 0x2
+        v = Vector{Tuple{Int, Int}}(undef, kmax)
+        for k in 0x1:kmax
+            v[k] = ImplicitBVH._k2ij_exclusive(n, k - 0x1)
+        end
+
+        # Test that pairs are generated in the correct order
+        iv = 1
+        for i in 0x0:n - 0x2
+            for j in i + 0x1:n - 0x1
+                v[iv] == (i, j) || return false
+                iv += 1
+            end
+        end
+
+        return true
+    end
+
+    for n in 1:100:5000
+        @test test_exclusive(n)
+    end
+
+    for n in Int32(1):Int32(100):Int32(5000)
+        @test test_exclusive(n)
     end
 end
 
@@ -126,6 +214,9 @@ end
     BSphere{Float32}([p1, p2, p3])
     BSphere([p1, p2, p3])
     BSphere(reshape([p1..., p2..., p3...], 3, 3))
+    x = BSphere((0., 0., 0.), 1.)
+    BSphere{Float32}(x)
+    BSphere(x)
 
     # Merging two touching spheres
     a = BSphere((0., 0., 0.), 0.5)
@@ -189,6 +280,9 @@ end
     BBox{Float32}([p1, p2, p3])
     BBox([p1, p2, p3])
     BBox(reshape([p1..., p2..., p3...], 3, 3))
+    x = BBox((0., 0., 0.), (1., 1., 1.))
+    BBox{Float32}(x)
+    BBox(x)
 
     # Merging two touching boxes
     a = BBox((0., 0., 0.), (1., 1., 1.))
@@ -236,20 +330,20 @@ end
 
     # Below box and ray going through corner ray direction flipped case
     box = BBox((0., 0., 0.), (1., 1., 1.))
-    point = [-1., -1., -1.]
-    direction = [-1., -1., -1.]
+    point = (-1., -1., -1.)
+    direction = (-1., -1., -1.)
     @test isintersection(box, point, direction) == false
 
     # Below box ray going up and through face
     box = BBox((0., 0., 0.), (1., 1., 1.))
-    point = [-1., -.5, 0.]
+    point = (-1., -.5, 0.)
     direction = [5., 3., 1.5]
     @test isintersection(box, point, direction) == true
 
     # Below box ray going up and through face
     box = BBox((0., 0., 0.), (1., 1., 1.))
     point = [0.5, -0.5, 0.5]
-    direction = [0., 1., 0.]
+    direction = (0., 1., 0.)
     @test isintersection(box, point, direction) == true
 
     # Below box ray going up and through face ray direction flipped case
@@ -294,20 +388,20 @@ end
 
     # ray above sphere passing up and not intersecting direction flipped
     sphere = BSphere((0., 0., 0.), 0.5)
-    point = [.5, .5, .5]
-    direction = [1., 1., 1.]
+    point = (.5, .5, .5)
+    direction = (1., 1., 1.)
     @test isintersection(sphere, point, direction) == false
 
     # ray below sphere passing up and intersecting
     sphere = BSphere((0., 0., 0.), 0.5)
-    point = [0., 0., -1.]
+    point = (0., 0., -1.)
     direction = [0., 0., 1.]
     @test isintersection(sphere, point, direction) == true
 
     # ray below sphere passing and not intersecting
     sphere = BSphere((0., 0., 0.), 0.5)
     point = [0., 0., -1.]
-    direction = [0., 0., -1.]
+    direction = (0., 0., -1.)
     @test isintersection(sphere, point, direction) == false
 
     # ray below sphere passing up and tangent to sphere
@@ -370,143 +464,26 @@ end
 
     @test isintersection(sphere, point, direction) == true
     @test isintersection(sphere, point, -direction) == true
+end
 
-    # Extensive ray tests
-    # Spehere for testing
-    p1 = Float64[0.7944654, 1.1890014, -9.944]
-    p2 = Float64[0.7944654, 1.1890014, 9.944]
-    p3 = Float64[1.0111626, 1.0111626, 9.944]
 
-    sphere = BSphere{Float64}(p1,p2,p3)
-    bvh = ImplicitBVH.BVH([sphere], ImplicitBVH.BBox{Float64}, UInt64)
+@testset "wrap_bounding_volumes" begin
+    bvs = map(BSphere, [rand(3, 3) for _ in 1:10])
+    options = BVHOptions(morton=DefaultMortonAlgorithm(UInt32))
+    wbvs = ImplicitBVH.wrap_bounding_volumes(bvs, options)
+    @test length(wbvs) == length(bvs)
+    @test all([b.index == i for (i, b) in enumerate(wbvs)])
+    @test all([b.volume == bvs[i] for (i, b) in enumerate(wbvs)])
+    @test all([b.morton isa UInt32 for b in wbvs])
 
-    test_x_point_range = (sphere.x[1] - sphere.r):1:(sphere.x[1] + sphere.r)
-    test_y_point_range = (sphere.x[2] - sphere.r):1:(sphere.x[2] + sphere.r)
-    test_z_point_range = (sphere.x[3] - sphere.r):1:(sphere.x[3] + sphere.r)
-
-    # Generate a matrix of points to test
-    points = [[[x; y; z] for x in test_x_point_range, y in test_y_point_range, z in test_z_point_range]...]
-    points = mapreduce(permutedims, vcat, points)'
-
-    # define test ray directions
-    x_plus_ray = [1,0,0] .* ones(3, size(points, 2))
-    x_minus_ray = [-1,0,0] .* ones(3, size(points, 2))
-    y_plus_ray = [0,1,0] .* ones(3, size(points, 2))
-    y_minus_ray = [0,-1,0] .* ones(3, size(points, 2))
-    z_plus_ray = [0,0,1] .* ones(3, size(points, 2))
-    z_minus_ray = [0,0,-1] .* ones(3, size(points, 2))
-
-    x_plus_traversal = traverse_rays(bvh, points, x_plus_ray)
-    x_minus_traversal = traverse_rays(bvh, points, x_minus_ray)
-    y_plus_traversal = traverse_rays(bvh, points, y_plus_ray)
-    y_minus_traversal = traverse_rays(bvh, points, y_minus_ray)
-    z_plus_traversal = traverse_rays(bvh, points, z_plus_ray)
-    z_minus_traversal = traverse_rays(bvh, points, z_minus_ray)
-
-    x_plus_contacts = x_plus_traversal.contacts
-    x_minus_contacts = x_minus_traversal.contacts
-    y_plus_contacts = y_plus_traversal.contacts
-    y_minus_contacts = y_minus_traversal.contacts
-    z_plus_contacts = z_plus_traversal.contacts
-    z_minus_contacts = z_minus_traversal.contacts
-
-    # Define BVH traversal contacts
-    x_plus_p_contacts = [contact[2] for contact in x_plus_contacts]
-    x_minus_p_contacts = [contact[2] for contact in x_minus_contacts]
-    y_plus_p_contacts = [contact[2] for contact in y_plus_contacts]
-    y_minus_p_contacts = [contact[2] for contact in y_minus_contacts]
-    z_plus_p_contacts = [contact[2] for contact in z_plus_contacts]
-    z_minus_p_contacts = [contact[2] for contact in z_minus_contacts]
-
-    # Positive ray in the x direction
-    # All points that lie to the left of the sphere center and in the circle in the yz plane
-    # should have a contact. Contacts to the right of the sphere center should only occur if the point is
-    # inside the sphere
-    x_plus_calculated_contacts = []
-    for i in 1:size(points, 2)
-        if points[1, i] <= sphere.x[1] && norm(points[2:3, i] .- sphere.x[2:3]) <= sphere.r
-            push!(x_plus_calculated_contacts, i)
-        elseif points[1, i] > sphere.x[1] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
-            push!(x_plus_calculated_contacts, i)
-        end
-    end
-
-    @test x_plus_p_contacts == x_plus_calculated_contacts
-
-    # Negative ray in the x direction
-    # All points that lie to the right of the sphere center and in the circle in the yz plane
-    # should have a contact. Contacts to the left of the sphere center should only occur if the point is
-    # inside the sphere
-    x_minus_calculated_contacts = []
-    for i in 1:size(points, 2)
-        if points[1, i] >= sphere.x[1] && norm(points[2:3, i] .- sphere.x[2:3]) <= sphere.r
-            push!(x_minus_calculated_contacts, i)
-        elseif points[1, i] < sphere.x[1] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
-            push!(x_minus_calculated_contacts, i)
-        end
-    end
-
-    @test x_minus_p_contacts == x_minus_calculated_contacts
-
-    # Positive ray in the y direction
-    # All points that lie below the sphere center and in the circle in the xz plane
-    # should have a contact. Contacts above the sphere center should only occur if the point is
-    # inside the sphere
-    y_plus_calculated_contacts = []
-    for i in 1:size(points, 2)
-        if points[2, i] <= sphere.x[2] && norm(points[[1,3], i] .- sphere.x[[1,3]]) <= sphere.r
-            push!(y_plus_calculated_contacts, i)
-        elseif points[2, i] > sphere.x[2] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
-            push!(y_plus_calculated_contacts, i)
-        end
-    end
-
-    @test y_plus_p_contacts == y_plus_calculated_contacts
-
-    # Negative ray in the y direction
-    # All points that lie above the sphere center and in the circle in the xz plane
-    # should have a contact. Contacts below the sphere center should only occur if the point is
-    # inside the sphere
-    y_minus_calculated_contacts = []
-    for i in 1:size(points, 2)
-        if points[2, i] >= sphere.x[2] && norm(points[[1,3], i] .- sphere.x[[1,3]]) <= sphere.r
-            push!(y_minus_calculated_contacts, i)
-        elseif points[2, i] < sphere.x[2] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
-            push!(y_minus_calculated_contacts, i)
-        end
-    end
-
-    @test y_minus_p_contacts == y_minus_calculated_contacts
-    
-    # Positive ray in the z direction
-    # All points that lie below the sphere center and in the circle in the xy plane 
-    # should have a contact. Contacts above the sphere center should only occur if the point is 
-    # inside the sphere
-    z_plus_calculated_contacts = []
-    for i in 1:size(points, 2)
-        if points[3, i] <= sphere.x[3] && norm(points[1:2, i] .- sphere.x[1:2]) <= sphere.r
-            push!(z_plus_calculated_contacts, i)
-        elseif points[3, i] > sphere.x[3] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
-            push!(z_plus_calculated_contacts, i)
-        end
-    end
-
-    @test z_plus_p_contacts == z_plus_calculated_contacts
-
-    # Negative ray in the z direction
-    # All points that lie above the sphere center and in the circle in the xy plane
-    # should have a contact. Contacts below the sphere center should only occur if the point is
-    # inside the sphere
-    z_minus_calculated_contacts = []
-    for i in 1:size(points, 2)
-        if points[3, i] >= sphere.x[3] && norm(points[1:2, i] .- sphere.x[1:2]) <= sphere.r
-            push!(z_minus_calculated_contacts, i)
-        elseif points[3, i] < sphere.x[3] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
-            push!(z_minus_calculated_contacts, i)
-        end
-    end
-
-    @test z_minus_p_contacts == z_minus_calculated_contacts
+    bvs = map(BBox{Float16}, [rand(3, 3) for _ in 1:10])
+    options = BVHOptions(index=Int16, morton=DefaultMortonAlgorithm(UInt16))
+    wbvs = ImplicitBVH.wrap_bounding_volumes(bvs, options)
+    @test length(wbvs) == length(bvs)
+    @test all([b.index == i for (i, b) in enumerate(wbvs)])
+    @test all([b.index isa Int16 for b in wbvs])
+    @test all([b.volume == bvs[i] for (i, b) in enumerate(wbvs)])
+    @test all([b.morton isa UInt16 for b in wbvs])
 end
 
 
@@ -530,7 +507,8 @@ end
 
     # Extrema computed at different precisions
     bv = map(BSphere{Float16}, [10 .* rand(3, 3) for _ in 1:100])
-    mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
+    wbvs = ImplicitBVH.wrap_bounding_volumes(bv, BVHOptions())
+    mins, maxs = ImplicitBVH.bounding_volumes_extrema(wbvs)
     @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
     @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
     @test all([ImplicitBVH.center(b)[3] > mins[3] for b in bv])
@@ -539,7 +517,8 @@ end
     @test all([ImplicitBVH.center(b)[3] < maxs[3] for b in bv])
 
     bv = map(BSphere{Float32}, [1000 .* rand(3, 3) for _ in 1:100])
-    mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
+    wbvs = ImplicitBVH.wrap_bounding_volumes(bv, BVHOptions())
+    mins, maxs = ImplicitBVH.bounding_volumes_extrema(wbvs)
     @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
     @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
     @test all([ImplicitBVH.center(b)[3] > mins[3] for b in bv])
@@ -548,7 +527,8 @@ end
     @test all([ImplicitBVH.center(b)[3] < maxs[3] for b in bv])
 
     bv = map(BSphere{Float64}, [1000 .* rand(3, 3) for _ in 1:100])
-    mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
+    wbvs = ImplicitBVH.wrap_bounding_volumes(bv, BVHOptions())
+    mins, maxs = ImplicitBVH.bounding_volumes_extrema(wbvs)
     @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
     @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
     @test all([ImplicitBVH.center(b)[3] > mins[3] for b in bv])
@@ -558,7 +538,8 @@ end
 
     # Extrema computed for degenerate inputs
     bv = [BSphere((0., 0., 0.), 1.)]
-    mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
+    wbvs = ImplicitBVH.wrap_bounding_volumes(bv, BVHOptions())
+    mins, maxs = ImplicitBVH.bounding_volumes_extrema(wbvs)
     @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
     @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
     @test all([ImplicitBVH.center(b)[3] > mins[3] for b in bv])
@@ -567,7 +548,8 @@ end
     @test all([ImplicitBVH.center(b)[3] < maxs[3] for b in bv])
 
     bv = [BSphere((1000., 0., 0.), 1.), BSphere((1000., 0., 0.), 1.)]
-    mins, maxs = ImplicitBVH.bounding_volumes_extrema(bv)
+    wbvs = ImplicitBVH.wrap_bounding_volumes(bv, BVHOptions())
+    mins, maxs = ImplicitBVH.bounding_volumes_extrema(wbvs)
     @test all([ImplicitBVH.center(b)[1] > mins[1] for b in bv])
     @test all([ImplicitBVH.center(b)[2] > mins[2] for b in bv])
     @test all([ImplicitBVH.center(b)[3] > mins[3] for b in bv])
@@ -575,49 +557,36 @@ end
     @test all([ImplicitBVH.center(b)[2] < maxs[2] for b in bv])
     @test all([ImplicitBVH.center(b)[3] < maxs[3] for b in bv])
 
-    # Different morton code sizes
-    bv = map(BSphere, [rand(3, 3) for _ in 1:10])
-    ImplicitBVH.morton_encode(bv, UInt16)
-    ImplicitBVH.morton_encode(bv, UInt32)
-    ImplicitBVH.morton_encode(bv, UInt64)
-    ImplicitBVH.morton_encode(bv)
-
-    bv = map(BBox, [rand(3, 3) for _ in 1:10])
-    ImplicitBVH.morton_encode(bv, UInt16)
-    ImplicitBVH.morton_encode(bv, UInt32)
-    ImplicitBVH.morton_encode(bv, UInt64)
-    ImplicitBVH.morton_encode(bv)
-
-    bv = map(BSphere{Float16}, [rand(3, 3) for _ in 1:10])
-    ImplicitBVH.morton_encode(bv, UInt16)
-    ImplicitBVH.morton_encode(bv, UInt32)
-    # ImplicitBVH.morton_encode(bv, UInt64)     # Range of UInt64 is too high compared to Float16
-    # ImplicitBVH.morton_encode(bv)
-
-    bv = map(BBox{Float16}, [rand(3, 3) for _ in 1:10])
-    ImplicitBVH.morton_encode(bv, UInt16)
-    ImplicitBVH.morton_encode(bv, UInt32)
-    # ImplicitBVH.morton_encode(bv, UInt64)     # Range of UInt64 is too high compared to Float16
-    # ImplicitBVH.morton_encode(bv)
-
-    bv = map(BSphere{Float32}, [rand(3, 3) for _ in 1:10])
-    ImplicitBVH.morton_encode(bv, UInt16)
-    ImplicitBVH.morton_encode(bv, UInt32)
-    ImplicitBVH.morton_encode(bv, UInt64)
-    ImplicitBVH.morton_encode(bv)
-
-    bv = map(BBox{Float32}, [rand(3, 3) for _ in 1:10])
-    ImplicitBVH.morton_encode(bv, UInt16)
-    ImplicitBVH.morton_encode(bv, UInt32)
-    ImplicitBVH.morton_encode(bv, UInt64)
-    ImplicitBVH.morton_encode(bv)
+    # Different setting combinations
+    for FloatType in (Float32, Float64)
+        for BVType in (BBox, BSphere)
+            bv = map(BVType{FloatType}, [rand(3, 3) for _ in 1:10])
+            for MortonType in (UInt16, UInt32, UInt64)
+                options = BVHOptions(morton=DefaultMortonAlgorithm(MortonType))
+                wbvs = ImplicitBVH.wrap_bounding_volumes(bv, options)
+                mbvs = ImplicitBVH.morton_encode!(wbvs, options.morton, options)
+                @test mbvs === wbvs     # in-place encoding
+                @test all([b.morton isa MortonType for b in wbvs])
+            end
+        end
+    end
 
     # Degenerate inputs
     a = BSphere((0., 0., 0.), 0.5)
     b = BSphere((1., 0., 0.), 0.1)
-    ImplicitBVH.morton_encode([a, b], UInt32)
-    ImplicitBVH.morton_encode([a, a], UInt32)
-    ImplicitBVH.morton_encode([a], UInt32)
+    options = BVHOptions(morton=DefaultMortonAlgorithm(UInt32))
+    ImplicitBVH.morton_encode!(
+        ImplicitBVH.wrap_bounding_volumes([a, b], options),
+        options,
+    )
+    ImplicitBVH.morton_encode!(
+        ImplicitBVH.wrap_bounding_volumes([a, a], options),
+        options,
+    )
+    ImplicitBVH.morton_encode!(
+        ImplicitBVH.wrap_bounding_volumes([a], options),
+        options,
+    )
 end
 
 
@@ -627,72 +596,71 @@ end
 
     using ImplicitBVH: center
 
-    # Simple, ordered bounding spheres traversal test
-    bvs = [
-        BSphere([0., 0, 0], 0.5),
-        BSphere([0., 0, 1], 0.6),
-        BSphere([0., 0, 2], 0.5),
-        BSphere([0., 0, 3], 0.4),
-        BSphere([0., 0, 4], 0.6),
-    ]
+    for alg in (BFSTraversal(), LVTTraversal())
+        # Simple, ordered bounding spheres traversal test
+        bvs = [
+            BSphere([0., 0, 0], 0.5),
+            BSphere([0., 0, 1], 0.6),
+            BSphere([0., 0, 2], 0.5),
+            BSphere([0., 0, 3], 0.4),
+            BSphere([0., 0, 4], 0.6),
+        ]
 
-    # Build the following ImplicitBVH from 5 bounding volumes:
-    #
-    #         Nodes & Leaves                Tree Level
-    #               1                       1
-    #       2               3               2
-    #   4       5       6        7v         3
-    # 8   9   10 11   12 13v  14v  15v      4
-    bvh = BVH(bvs)
-    @test length(bvh.nodes) == 6
+        # Build the following ImplicitBVH from 5 bounding volumes:
+        #
+        #         Nodes & Leaves                Tree Level
+        #               1                       1
+        #       2               3               2
+        #   4       5       6        7v         3
+        # 8   9   10 11   12 13v  14v  15v      4
+        bvh = BVH(bvs, eltype(bvs))
+        @test length(bvh.nodes) == 6
 
-    # Test the default start levels
-    @test default_start_level(bvh) == default_start_level(length(bvs))
+        # Level 3
+        @test bvh.nodes[4].x ≈ (bvs[1] + bvs[2]).x      # First two BVs are paired
+        @test bvh.nodes[5].x ≈ (bvs[3] + bvs[4]).x      # Next two BVs are paired
+        @test bvh.nodes[6].x ≈ bvs[5].x                 # Last BV has no pair
 
-    # Level 3
-    @test bvh.nodes[4].x ≈ (bvs[1] + bvs[2]).x      # First two BVs are paired
-    @test bvh.nodes[5].x ≈ (bvs[3] + bvs[4]).x      # Next two BVs are paired
-    @test bvh.nodes[6].x ≈ bvs[5].x                 # Last BV has no pair
+        # Level 2
+        @test bvh.nodes[2].x ≈ ((bvs[1] + bvs[2]) + (bvs[3] + bvs[4])).x
+        @test bvh.nodes[3].x ≈ bvs[5].x
 
-    # Level 2
-    @test bvh.nodes[2].x ≈ ((bvs[1] + bvs[2]) + (bvs[3] + bvs[4])).x
-    @test bvh.nodes[3].x ≈ bvs[5].x
+        # Root
+        @test bvh.nodes[1].x ≈ ((bvs[1] + bvs[2]) + (bvs[3] + bvs[4]) + bvs[5]).x
 
-    # Root
-    @test bvh.nodes[1].x ≈ ((bvs[1] + bvs[2]) + (bvs[3] + bvs[4]) + bvs[5]).x
+        # Find contacting pairs
+        traversal = traverse(bvh, alg)
 
-    # Find contacting pairs
-    traversal = traverse(bvh)
+        @test length(traversal.contacts) == 3
+        @test (4, 5) in traversal.contacts
+        @test (1, 2) in traversal.contacts
+        @test (2, 3) in traversal.contacts
 
-    @test length(traversal.contacts) == 3
-    @test (4, 5) in traversal.contacts
-    @test (1, 2) in traversal.contacts
-    @test (2, 3) in traversal.contacts
+        # Build the same BVH with BBox nodes
+        leaf = BBox{Float64}
+        bvh = BVH(bvs, leaf)
+        @test length(bvh.nodes) == 6
 
-    # Build the same BVH with BBox nodes
-    leaf = BBox{Float64}
-    bvh = BVH(bvs, leaf)
-    @test length(bvh.nodes) == 6
+        # Level 3
+        @test center(bvh.nodes[4]) ≈ center(leaf(bvs[1], bvs[2]))      # First two BVs are paired
+        @test center(bvh.nodes[5]) ≈ center(leaf(bvs[3], bvs[4]))      # Next two BVs are paired
+        @test center(bvh.nodes[6]) ≈ center(bvs[5])                    # Last BV has no pair
 
-    # Level 3
-    @test center(bvh.nodes[4]) ≈ center(leaf(bvs[1], bvs[2]))      # First two BVs are paired
-    @test center(bvh.nodes[5]) ≈ center(leaf(bvs[3], bvs[4]))      # Next two BVs are paired
-    @test center(bvh.nodes[6]) ≈ center(bvs[5])                    # Last BV has no pair
+        # Level 2
+        @test center(bvh.nodes[2]) ≈ center(leaf(bvs[1], bvs[2]) + leaf(bvs[3], bvs[4]))
+        @test center(bvh.nodes[3]) ≈ center(bvs[5])
 
-    # Level 2
-    @test center(bvh.nodes[2]) ≈ center(leaf(bvs[1], bvs[2]) + leaf(bvs[3], bvs[4]))
-    @test center(bvh.nodes[3]) ≈ center(bvs[5])
+        # Root
+        @test center(bvh.nodes[1]) ≈ center(leaf(bvs[1], bvs[2]) + leaf(bvs[3], bvs[4]) + leaf(bvs[5]))
 
-    # Root
-    @test center(bvh.nodes[1]) ≈ center(leaf(bvs[1], bvs[2]) + leaf(bvs[3], bvs[4]) + leaf(bvs[5]))
+        # Find contacting pairs
+        traversal = traverse(bvh, alg)
 
-    # Find contacting pairs
-    traversal = traverse(bvh)
-
-    @test length(traversal.contacts) == 3
-    @test (4, 5) in traversal.contacts
-    @test (1, 2) in traversal.contacts
-    @test (2, 3) in traversal.contacts
+        @test length(traversal.contacts) == 3
+        @test (4, 5) in traversal.contacts
+        @test (1, 2) in traversal.contacts
+        @test (2, 3) in traversal.contacts
+    end
 end
 
 
@@ -700,328 +668,336 @@ end
 
 @testset "bvh_single_bbox_small_ordered" begin
 
-    # Simple, ordered bounding box traversal test
-    bvs = [
-        BBox(BSphere([0., 0, 0], 0.5)),
-        BBox(BSphere([0., 0, 1], 0.6)),
-        BBox(BSphere([0., 0, 2], 0.5)),
-        BBox(BSphere([0., 0, 3], 0.4)),
-        BBox(BSphere([0., 0, 4], 0.6)),
-    ]
+    for alg in (BFSTraversal(), LVTTraversal())
+        # Simple, ordered bounding box traversal test
+        bvs = [
+            BBox(BSphere([0., 0, 0], 0.5)),
+            BBox(BSphere([0., 0, 1], 0.6)),
+            BBox(BSphere([0., 0, 2], 0.5)),
+            BBox(BSphere([0., 0, 3], 0.4)),
+            BBox(BSphere([0., 0, 4], 0.6)),
+        ]
 
-    # Build the following ImplicitBVH from 5 bounding volumes:
-    #
-    #         Nodes & Leaves                Tree Level
-    #               1                       1
-    #       2               3               2
-    #   4       5       6        7v         3
-    # 8   9   10 11   12 13v  14v  15v      4
-    bvh = BVH(bvs)
-    @test length(bvh.nodes) == 6
+        # Build the following ImplicitBVH from 5 bounding volumes:
+        #
+        #         Nodes & Leaves                Tree Level
+        #               1                       1
+        #       2               3               2
+        #   4       5       6        7v         3
+        # 8   9   10 11   12 13v  14v  15v      4
+        bvh = BVH(bvs, eltype(bvs))
+        @test length(bvh.nodes) == 6
 
-    # Test the default start levels
-    @test default_start_level(bvh) == default_start_level(length(bvs))
+        # Level 3
+        center = ImplicitBVH.center
+        @test center(bvh.nodes[4]) ≈ center(bvs[1] + bvs[2])      # First two BVs are paired
+        @test center(bvh.nodes[5]) ≈ center(bvs[3] + bvs[4])      # Next two BVs are paired
+        @test center(bvh.nodes[6]) ≈ center(bvs[5])               # Last BV has no pair
 
-    # Level 3
-    center = ImplicitBVH.center
-    @test center(bvh.nodes[4]) ≈ center(bvs[1] + bvs[2])      # First two BVs are paired
-    @test center(bvh.nodes[5]) ≈ center(bvs[3] + bvs[4])      # Next two BVs are paired
-    @test center(bvh.nodes[6]) ≈ center(bvs[5])               # Last BV has no pair
+        # Level 2
+        @test center(bvh.nodes[2]) ≈ center((bvs[1] + bvs[2]) + (bvs[3] + bvs[4]))
+        @test center(bvh.nodes[3]) ≈ center(bvs[5])
 
-    # Level 2
-    @test center(bvh.nodes[2]) ≈ center((bvs[1] + bvs[2]) + (bvs[3] + bvs[4]))
-    @test center(bvh.nodes[3]) ≈ center(bvs[5])
+        # Root
+        @test center(bvh.nodes[1]) ≈ center((bvs[1] + bvs[2]) + (bvs[3] + bvs[4]) + bvs[5])
 
-    # Root
-    @test center(bvh.nodes[1]) ≈ center((bvs[1] + bvs[2]) + (bvs[3] + bvs[4]) + bvs[5])
+        # Find contacting pairs
+        traversal = traverse(bvh, alg)
 
-    # Find contacting pairs
-    traversal = traverse(bvh)
-
-    @test length(traversal.contacts) == 3
-    @test (4, 5) in traversal.contacts
-    @test (1, 2) in traversal.contacts
-    @test (2, 3) in traversal.contacts
+        @test length(traversal.contacts) == 3
+        @test (4, 5) in traversal.contacts
+        @test (1, 2) in traversal.contacts
+        @test (2, 3) in traversal.contacts
+    end
 end
 
 
 
 
 @testset "bvh_single_bsphere_small_unordered" begin
-    # Bounding spheres traversal test with unordered spheres
-    bvs = [
-        BSphere([0., 0, 1], 0.6),
-        BSphere([0., 0, 2], 0.5),
-        BSphere([0., 0, 0], 0.5),
-        BSphere([0., 0, 4], 0.6),
-        BSphere([0., 0, 3], 0.4),
-    ]
 
-    # Build the following ImplicitBVH from 5 bounding volumes:
-    #
-    #         Nodes & Leaves                Tree Level
-    #               1                       1
-    #       2               3               2
-    #   4       5       6        7v         3
-    # 8   9   10 11   12 13v  14v  15v      4
-    bvh = BVH(bvs)
-    @test length(bvh.nodes) == 6
+    for alg in (BFSTraversal(), LVTTraversal())
+        # Bounding spheres traversal test with unordered spheres
+        bvs = [
+            BSphere([0., 0, 1], 0.6),
+            BSphere([0., 0, 2], 0.5),
+            BSphere([0., 0, 0], 0.5),
+            BSphere([0., 0, 4], 0.6),
+            BSphere([0., 0, 3], 0.4),
+        ]
 
-    # Test the default start levels
-    @test default_start_level(bvh) == default_start_level(length(bvs))
+        # Build the following ImplicitBVH from 5 bounding volumes:
+        #
+        #         Nodes & Leaves                Tree Level
+        #               1                       1
+        #       2               3               2
+        #   4       5       6        7v         3
+        # 8   9   10 11   12 13v  14v  15v      4
+        bvh = BVH(bvs, eltype(bvs))
+        @test length(bvh.nodes) == 6
 
-    # Level 3
-    @test bvh.nodes[4].x ≈ (bvs[3] + bvs[1]).x      # First two BVs are paired
-    @test bvh.nodes[5].x ≈ (bvs[2] + bvs[5]).x      # Next two BVs are paired
-    @test bvh.nodes[6].x ≈ bvs[4].x                 # Last BV has no pair
+        # Level 3
+        @test bvh.nodes[4].x ≈ (bvs[3] + bvs[1]).x      # First two BVs are paired
+        @test bvh.nodes[5].x ≈ (bvs[2] + bvs[5]).x      # Next two BVs are paired
+        @test bvh.nodes[6].x ≈ bvs[4].x                 # Last BV has no pair
 
-    # Level 2
-    @test bvh.nodes[2].x ≈ ((bvs[3] + bvs[1]) + (bvs[2] + bvs[5])).x
-    @test bvh.nodes[3].x ≈ bvs[4].x
+        # Level 2
+        @test bvh.nodes[2].x ≈ ((bvs[3] + bvs[1]) + (bvs[2] + bvs[5])).x
+        @test bvh.nodes[3].x ≈ bvs[4].x
 
-    # Root
-    @test bvh.nodes[1].x ≈ ((bvs[3] + bvs[1]) + (bvs[2] + bvs[5]) + bvs[4]).x
+        # Root
+        @test bvh.nodes[1].x ≈ ((bvs[3] + bvs[1]) + (bvs[2] + bvs[5]) + bvs[4]).x
 
-    # Find contacting pairs
-    traversal = traverse(bvh)
+        # Find contacting pairs
+        traversal = traverse(bvh, alg)
 
-    @test length(traversal.contacts) == 3
-    @test (4, 5) in traversal.contacts
-    @test (1, 3) in traversal.contacts
-    @test (1, 2) in traversal.contacts
+        @test length(traversal.contacts) == 3
+        @test (4, 5) in traversal.contacts
+        @test (1, 3) in traversal.contacts
+        @test (1, 2) in traversal.contacts
 
-    # Build the same BVH with BBox nodes
-    leaf = BBox{Float64}
-    bvh = BVH(bvs, leaf)
-    @test length(bvh.nodes) == 6
+        # Build the same BVH with BBox nodes
+        leaf = BBox{Float64}
+        bvh = BVH(bvs, leaf)
+        @test length(bvh.nodes) == 6
 
-    # Level 3
-    center = ImplicitBVH.center
-    @test center(bvh.nodes[4]) ≈ center(leaf(bvs[3], bvs[1]))      # First two BVs are paired
-    @test center(bvh.nodes[5]) ≈ center(leaf(bvs[2], bvs[5]))      # Next two BVs are paired
-    @test center(bvh.nodes[6]) ≈ center(bvs[4])                    # Last BV has no pair
+        # Level 3
+        center = ImplicitBVH.center
+        @test center(bvh.nodes[4]) ≈ center(leaf(bvs[3], bvs[1]))      # First two BVs are paired
+        @test center(bvh.nodes[5]) ≈ center(leaf(bvs[2], bvs[5]))      # Next two BVs are paired
+        @test center(bvh.nodes[6]) ≈ center(bvs[4])                    # Last BV has no pair
 
-    # Level 2
-    @test center(bvh.nodes[2]) ≈ center(leaf(bvs[3], bvs[1]) + leaf(bvs[2], bvs[5]))
-    @test center(bvh.nodes[3]) ≈ center(bvs[4])
+        # Level 2
+        @test center(bvh.nodes[2]) ≈ center(leaf(bvs[3], bvs[1]) + leaf(bvs[2], bvs[5]))
+        @test center(bvh.nodes[3]) ≈ center(bvs[4])
 
-    # Root
-    @test center(bvh.nodes[1]) ≈ center(leaf(bvs[3], bvs[1]) + leaf(bvs[2], bvs[5]) + leaf(bvs[4]))
+        # Root
+        @test center(bvh.nodes[1]) ≈ center(leaf(bvs[3], bvs[1]) + leaf(bvs[2], bvs[5]) + leaf(bvs[4]))
 
-    # Find contacting pairs
-    traversal = traverse(bvh)
+        # Find contacting pairs
+        traversal = traverse(bvh, alg)
 
-    @test length(traversal.contacts) == 3
-    @test (4, 5) in traversal.contacts
-    @test (1, 3) in traversal.contacts
-    @test (1, 2) in traversal.contacts
+        @test length(traversal.contacts) == 3
+        @test (4, 5) in traversal.contacts
+        @test (1, 3) in traversal.contacts
+        @test (1, 2) in traversal.contacts
+    end
 end
 
 
 
 
 @testset "bvh_single_bbox_small_unordered" begin
-    # Bounding spheres traversal test with unordered spheres
-    bvs = [
-        BBox(BSphere([0., 0, 1], 0.6)),
-        BBox(BSphere([0., 0, 2], 0.5)),
-        BBox(BSphere([0., 0, 0], 0.5)),
-        BBox(BSphere([0., 0, 4], 0.6)),
-        BBox(BSphere([0., 0, 3], 0.4)),
-    ]
 
-    # Build the following ImplicitBVH from 5 bounding volumes:
-    #
-    #         Nodes & Leaves                Tree Level
-    #               1                       1
-    #       2               3               2
-    #   4       5       6        7v         3
-    # 8   9   10 11   12 13v  14v  15v      4
-    bvh = BVH(bvs)
-    @test length(bvh.nodes) == 6
+    for alg in (BFSTraversal(), LVTTraversal())
+        # Bounding spheres traversal test with unordered spheres
+        bvs = [
+            BBox(BSphere([0., 0, 1], 0.6)),
+            BBox(BSphere([0., 0, 2], 0.5)),
+            BBox(BSphere([0., 0, 0], 0.5)),
+            BBox(BSphere([0., 0, 4], 0.6)),
+            BBox(BSphere([0., 0, 3], 0.4)),
+        ]
 
-    # Test the default start levels
-    @test default_start_level(bvh) == default_start_level(length(bvs))
+        # Build the following ImplicitBVH from 5 bounding volumes:
+        #
+        #         Nodes & Leaves                Tree Level
+        #               1                       1
+        #       2               3               2
+        #   4       5       6        7v         3
+        # 8   9   10 11   12 13v  14v  15v      4
+        bvh = BVH(bvs, eltype(bvs))
+        @test length(bvh.nodes) == 6
 
-    # Level 3
-    center = ImplicitBVH.center
-    @test center(bvh.nodes[4]) ≈ center(bvs[3] + bvs[1])      # First two BVs are paired
-    @test center(bvh.nodes[5]) ≈ center(bvs[2] + bvs[5])      # Next two BVs are paired
-    @test center(bvh.nodes[6]) ≈ center(bvs[4])               # Last BV has no pair
+        # Level 3
+        center = ImplicitBVH.center
+        @test center(bvh.nodes[4]) ≈ center(bvs[3] + bvs[1])      # First two BVs are paired
+        @test center(bvh.nodes[5]) ≈ center(bvs[2] + bvs[5])      # Next two BVs are paired
+        @test center(bvh.nodes[6]) ≈ center(bvs[4])               # Last BV has no pair
 
-    # Level 2
-    @test center(bvh.nodes[2]) ≈ center((bvs[3] + bvs[1]) + (bvs[2] + bvs[5]))
-    @test center(bvh.nodes[3]) ≈ center(bvs[4])
+        # Level 2
+        @test center(bvh.nodes[2]) ≈ center((bvs[3] + bvs[1]) + (bvs[2] + bvs[5]))
+        @test center(bvh.nodes[3]) ≈ center(bvs[4])
 
-    # Root
-    @test center(bvh.nodes[1]) ≈ center((bvs[3] + bvs[1]) + (bvs[2] + bvs[5]) + bvs[4])
+        # Root
+        @test center(bvh.nodes[1]) ≈ center((bvs[3] + bvs[1]) + (bvs[2] + bvs[5]) + bvs[4])
 
-    # Find contacting pairs
-    traversal = traverse(bvh)
+        # Find contacting pairs
+        traversal = traverse(bvh, alg)
 
-    @test length(traversal.contacts) == 3
-    @test (4, 5) in traversal.contacts
-    @test (1, 3) in traversal.contacts
-    @test (1, 2) in traversal.contacts
+        @test length(traversal.contacts) == 3
+        @test (4, 5) in traversal.contacts
+        @test (1, 3) in traversal.contacts
+        @test (1, 2) in traversal.contacts
+    end
 end
 
 
 
 
-@testset "bvh_single_randomised" begin
-    # Random bounding volumes of different densities; BSphere leaves, BSphere nodes
-    Random.seed!(42)
+for alg in (BFSTraversal(), LVTTraversal())
+    @testset "bvh_single_$(alg)_randomised" begin
+        # Random bounding volumes of different densities; BSphere leaves, BSphere nodes
+        Random.seed!(42)
 
-    for num_entities in 1:11:200
+        for num_entities in 1:11:200
 
-        # Test different starting levels
-        tree = ImplicitTree(num_entities)
-        for start_level in 1:tree.levels
-            bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
+            # Test different starting levels
+            tree = ImplicitTree(num_entities)
+            for start_level in 1:tree.levels
+                bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
 
-            # Brute force contact detection
-            brute_contacts = ImplicitBVH.IndexPair{Int}[]
-            for i in 1:length(bvs)
-                for j in i + 1:length(bvs)
-                    if ImplicitBVH.iscontact(bvs[i], bvs[j])
-                        push!(brute_contacts, (i, j))
+                # Brute force contact detection
+                brute_contacts = ImplicitBVH.IndexPair{Int}[]
+                for i in 1:length(bvs)
+                    for j in i + 1:length(bvs)
+                        if ImplicitBVH.iscontact(bvs[i], bvs[j])
+                            push!(brute_contacts, (i, j))
+                        end
                     end
                 end
+
+                # ImplicitBVH-based contact detection
+                bvh = BVH(bvs)
+                traversal = traverse(bvh, alg, start_level=start_level)
+                bvh_contacts = traversal.contacts
+
+                # Ensure ImplicitBVH finds same contacts as checking all possible pairs
+                @test length(brute_contacts) == length(bvh_contacts)
+                @test all(brute_contact in bvh_contacts for brute_contact in brute_contacts)
             end
-
-            # ImplicitBVH-based contact detection
-            bvh = BVH(bvs)
-            traversal = traverse(bvh, start_level)
-            bvh_contacts = traversal.contacts
-
-            # Test the default start levels
-            @test default_start_level(bvh) == default_start_level(length(bvs))
-
-            # Ensure ImplicitBVH finds same contacts as checking all possible pairs
-            @test length(brute_contacts) == length(bvh_contacts)
-            @test all(brute_contact in bvh_contacts for brute_contact in brute_contacts)
         end
-    end
 
-    # Random bounding volumes of different densities; BSphere leaves, BBox nodes
-    Random.seed!(42)
-    for num_entities in 1:11:200
-        # Test different starting levels
-        tree = ImplicitTree(num_entities)
-        for start_level in 1:tree.levels
-            bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
+        # Random bounding volumes of different densities; BSphere leaves, BBox nodes
+        Random.seed!(42)
+        for num_entities in 1:11:200
+            # Test different starting levels
+            tree = ImplicitTree(num_entities)
+            for start_level in 1:tree.levels
+                bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
 
-            # Brute force contact detection
-            brute_contacts = ImplicitBVH.IndexPair{Int}[]
-            for i in 1:length(bvs)
-                for j in i + 1:length(bvs)
-                    if ImplicitBVH.iscontact(bvs[i], bvs[j])
-                        push!(brute_contacts, (i, j))
+                # Brute force contact detection
+                brute_contacts = ImplicitBVH.IndexPair{Int}[]
+                for i in 1:length(bvs)
+                    for j in i + 1:length(bvs)
+                        if ImplicitBVH.iscontact(bvs[i], bvs[j])
+                            push!(brute_contacts, (i, j))
+                        end
                     end
                 end
+
+                # ImplicitBVH-based contact detection
+                bvh = BVH(bvs, BBox{Float64})
+                traversal = traverse(bvh, alg, start_level=start_level)
+                bvh_contacts = traversal.contacts
+
+                # Ensure ImplicitBVH finds same contacts as checking all possible pairs
+                @test length(brute_contacts) == length(bvh_contacts)
+                @test all(brute_contact in bvh_contacts for brute_contact in brute_contacts)
             end
-
-            # ImplicitBVH-based contact detection
-            bvh = BVH(bvs, BBox{Float64})
-            traversal = traverse(bvh, start_level)
-            bvh_contacts = traversal.contacts
-
-            # Test the default start levels
-            @test default_start_level(bvh) == default_start_level(length(bvs))
-
-            # Ensure ImplicitBVH finds same contacts as checking all possible pairs
-            @test length(brute_contacts) == length(bvh_contacts)
-            @test all(brute_contact in bvh_contacts for brute_contact in brute_contacts)
         end
     end
 
     # Testing different settings
     Random.seed!(42)
-    bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:100])
-    bvh = BVH(bvs)
+    bvs = map(BSphere{Float64}, [6 * rand(3) .+ rand(3, 3) for _ in 1:100])
+    bvh = BVH(bvs, BBox{Float64})
     traversal = traverse(bvh)
 
-    BVH(bvs, BSphere{Float64})
+    BVH(bvs, BSphere{Float32})
     BVH(bvs, BBox{Float64})
-    BVH(bvs, BBox{Float64}, UInt32)
-    BVH(bvs, BBox{Float64}, UInt32, 3)
-    BVH(bvs, BBox{Float64}, UInt32, 0.0)
-    BVH(bvs, BBox{Float64}, UInt32, 0.5)
-    BVH(bvs, BBox{Float64}, UInt32, 1.0)
-    BVH(bvs, BSphere{Float64}, UInt32, 3, bvh)
+    BVH(bvs, BBox{Float64}, options=BVHOptions(morton=DefaultMortonAlgorithm(UInt32)))
+    BVH(bvs, BBox{Float64}, options=BVHOptions(morton=DefaultMortonAlgorithm(UInt32)), built_level=3)
+    BVH(bvs, BBox{Float64}, options=BVHOptions(morton=DefaultMortonAlgorithm(UInt32)), built_level=0.0)
+    BVH(bvs, BBox{Float64}, options=BVHOptions(morton=DefaultMortonAlgorithm(UInt32)), built_level=0.5)
+    BVH(bvs, BBox{Float64}, options=BVHOptions(morton=DefaultMortonAlgorithm(UInt32)), built_level=1.0)
+    BVH(bvs, BBox{Float64}, options=BVHOptions(morton=DefaultMortonAlgorithm(UInt32)), built_level=3, cache=bvh)
 
-    # Type mismatch between cache (BSphere) and nodes (BBox)
-    @test_throws ArgumentError BVH(bvs, BBox{Float64}, UInt32, 1, bvh)
+    # Type mismatch between cache (BBox{Float64}) and nodes (BBox{Float32})
+    @test_throws ArgumentError BVH(bvs, BBox{Float32}, cache=bvh)
 
-    traverse(bvh, 3)
-    traverse(bvh, 3, traversal)
+    # Manually create BoundingVolume
+    wbvs = ImplicitBVH.wrap_bounding_volumes(bvs, BVHOptions())
+    bvh = BVH(wbvs, BBox{Float64})
+
+    # Manually create BoundingVolume with index type mismatch
+    wbvs = ImplicitBVH.wrap_bounding_volumes(bvs, BVHOptions(index=Int64))
+    @test_throws ArgumentError BVH(wbvs)
+
+    # Manually create BoundingVolume with morton type mismatch
+    wbvs = ImplicitBVH.wrap_bounding_volumes(bvs, BVHOptions(morton=DefaultMortonAlgorithm(UInt64)))
+    @test_throws ArgumentError BVH(wbvs)
 end
 
 
 
 
-@testset "bvh_pair_equivalent_randomised" begin
-    # Random bounding volumes of different densities; BSphere leaves, BSphere nodes
-    Random.seed!(42)
-    for num_entities in 1:11:200
+for alg in (BFSTraversal(), LVTTraversal())
+    @testset "bvh_pair_$(alg)_equivalent_randomised" begin
+        # Random bounding volumes of different densities; BSphere leaves, BSphere nodes
+        Random.seed!(42)
+        for num_entities in 1:11:200
 
-        # Test different starting levels
-        tree = ImplicitTree(num_entities)
-        for start_level1 in 1:tree.levels, start_level2 in 1:tree.levels
-            bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
-            bvh = BVH(bvs)
+            # Test different starting levels
+            tree = ImplicitTree(num_entities)
+            for start_level1 in 1:tree.levels, start_level2 in 1:tree.levels
+                bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
+                bvh = BVH(bvs)
 
-            # Test the default start levels
-            @test default_start_level(bvh) == default_start_level(length(bvs))
+                # First traverse the BVH normally, then as if we had two different BVHs
+                contacts1 = traverse(bvh, alg, start_level=start_level1).contacts
+                contacts2 = traverse(
+                    bvh, bvh, alg,
+                    start_level1=start_level1,
+                    start_level2=start_level2,
+                ).contacts
 
-            # First traverse the BVH normally, then as if we had two different BVHs
-            contacts1 = traverse(bvh, start_level1).contacts
-            contacts2 = traverse(bvh, bvh, start_level1, start_level2).contacts
+                # The second one should have the same contacts as contacts1, plus contacts between the
+                # same BVs and reverse order; e.g. if contacts1=[(1, 2), (2, 3)], then
+                # contacts2=[(1, 1), (2, 2), (3, 3), (1, 2), (2, 1), (2, 3), (3, 2)]. Check this.
+                @test all((i, i) in contacts2 for i in 1:num_entities)
+                contacts2 = [(i, j) for (i, j) in contacts2 if i != j]
 
-            # The second one should have the same contacts as contacts1, plus contacts between the
-            # same BVs and reverse order; e.g. if contacts1=[(1, 2), (2, 3)], then
-            # contacts2=[(1, 1), (2, 2), (3, 3), (1, 2), (2, 1), (2, 3), (3, 2)]. Check this.
-            @test all((i, i) in contacts2 for i in 1:num_entities)
-            contacts2 = [(i, j) for (i, j) in contacts2 if i != j]
+                @test all((j, i) in contacts2 for (i, j) in contacts2)
+                contacts2 = [(i, j) for (i, j) in contacts2 if i < j]
 
-            @test all((j, i) in contacts2 for (i, j) in contacts2)
-            contacts2 = [(i, j) for (i, j) in contacts2 if i < j]
-
-            sort!(contacts1)
-            sort!(contacts2)
-            @test contacts1 == contacts2
+                sort!(contacts1)
+                sort!(contacts2)
+                @test contacts1 == contacts2
+            end
         end
-    end
 
-    # Random bounding volumes of different densities; BSphere leaves, BBox nodes
-    Random.seed!(42)
-    for num_entities in 1:11:200
+        # Random bounding volumes of different densities; BSphere leaves, BBox nodes
+        Random.seed!(42)
+        for num_entities in 1:11:200
 
-        # Test different starting levels
-        tree = ImplicitTree(num_entities)
-        for start_level1 in 1:tree.levels, start_level2 in 1:tree.levels
-            bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
-            bvh = BVH(bvs, BBox{Float64})
+            # Test different starting levels
+            tree = ImplicitTree(num_entities)
+            for start_level1 in 1:tree.levels, start_level2 in 1:tree.levels
+                bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
+                bvh = BVH(bvs, BBox{Float64})
 
-            # Test the default start levels
-            @test default_start_level(bvh) == default_start_level(length(bvs))
+                # First traverse the BVH normally, then as if we had two different BVHs
+                contacts1 = traverse(bvh, alg, start_level=start_level1).contacts
+                contacts2 = traverse(
+                    bvh, bvh, alg,
+                    start_level1=start_level1,
+                    start_level2=start_level2,
+                ).contacts
 
-            # First traverse the BVH normally, then as if we had two different BVHs
-            contacts1 = traverse(bvh, start_level1).contacts
-            contacts2 = traverse(bvh, bvh, start_level1, start_level2).contacts
+                # The second one should have the same contacts as contacts1, plus contacts between the
+                # same BVs and reverse order; e.g. if contacts1=[(1, 2), (2, 3)], then
+                # contacts2=[(1, 1), (2, 2), (3, 3), (1, 2), (2, 1), (2, 3), (3, 2)]. Check this.
+                @test all((i, i) in contacts2 for i in 1:num_entities)
+                contacts2 = [(i, j) for (i, j) in contacts2 if i != j]
 
-            # The second one should have the same contacts as contacts1, plus contacts between the
-            # same BVs and reverse order; e.g. if contacts1=[(1, 2), (2, 3)], then
-            # contacts2=[(1, 1), (2, 2), (3, 3), (1, 2), (2, 1), (2, 3), (3, 2)]. Check this.
-            @test all((i, i) in contacts2 for i in 1:num_entities)
-            contacts2 = [(i, j) for (i, j) in contacts2 if i != j]
+                @test all((j, i) in contacts2 for (i, j) in contacts2)
+                contacts2 = [(i, j) for (i, j) in contacts2 if i < j]
 
-            @test all((j, i) in contacts2 for (i, j) in contacts2)
-            contacts2 = [(i, j) for (i, j) in contacts2 if i < j]
-
-            sort!(contacts1)
-            sort!(contacts2)
-            @test contacts1 == contacts2
+                sort!(contacts1)
+                sort!(contacts2)
+                @test contacts1 == contacts2
+            end
         end
     end
 end
@@ -1029,77 +1005,270 @@ end
 
 
 
-@testset "bvh_pair_randomised" begin
-    # Random bounding volumes of different densities; BSphere leaves, BSphere nodes
-    Random.seed!(42)
+for alg in (BFSTraversal(), LVTTraversal())
+    @testset "bvh_pair_$(alg)_randomised" begin
+        # Random bounding volumes of different densities; BSphere leaves, BSphere nodes
+        Random.seed!(42)
 
-    for num_entities1 in 1:21:200, num_entities2 in 1:21:200
+        for num_entities1 in 1:21:200, num_entities2 in 1:21:200
 
-        # Test different starting levels
-        tree1 = ImplicitTree(num_entities1)
-        tree2 = ImplicitTree(num_entities2)
+            # Test different starting levels
+            tree1 = ImplicitTree(num_entities1)
+            tree2 = ImplicitTree(num_entities2)
 
-        for start_level1 in 1:tree1.levels, start_level2 in 1:tree2.levels
-            bvs1 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities1])
-            bvs2 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities2])
+            for start_level1 in 1:tree1.levels, start_level2 in 1:tree2.levels
+                bvs1 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities1])
+                bvs2 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities2])
 
-            # Brute force contact detection
-            brute_contacts = ImplicitBVH.IndexPair{Int}[]
-            for i in 1:length(bvs1)
-                for j in 1:length(bvs2)
-                    if ImplicitBVH.iscontact(bvs1[i], bvs2[j])
-                        push!(brute_contacts, (i, j))
+                # Brute force contact detection
+                brute_contacts = ImplicitBVH.IndexPair{Int}[]
+                for i in 1:length(bvs1)
+                    for j in 1:length(bvs2)
+                        if ImplicitBVH.iscontact(bvs1[i], bvs2[j])
+                            push!(brute_contacts, (i, j))
+                        end
                     end
                 end
+
+                # ImplicitBVH-based contact detection
+                bvh1 = BVH(bvs1)
+                bvh2 = BVH(bvs2)
+                traversal = traverse(bvh1, bvh2, alg, start_level1=start_level1, start_level2=start_level2)
+                bvh_contacts = traversal.contacts
+
+                # Ensure ImplicitBVH finds same contacts as checking all possible pairs
+                @test length(brute_contacts) == length(bvh_contacts)
+                @test all(brute_contact in bvh_contacts for brute_contact in brute_contacts)
             end
-
-            # ImplicitBVH-based contact detection
-            bvh1 = BVH(bvs1)
-            bvh2 = BVH(bvs2)
-            traversal = traverse(bvh1, bvh2, start_level1, start_level2)
-            bvh_contacts = traversal.contacts
-
-            # Ensure ImplicitBVH finds same contacts as checking all possible pairs
-            @test length(brute_contacts) == length(bvh_contacts)
-            @test all(brute_contact in bvh_contacts for brute_contact in brute_contacts)
         end
-    end
 
-    # Random bounding volumes of different densities; BSphere leaves, BBox nodes
-    Random.seed!(42)
-    for num_entities1 in 1:21:200, num_entities2 in 1:21:200
+        # Random bounding volumes of different densities; BSphere leaves, BBox nodes
+        Random.seed!(42)
+        for num_entities1 in 1:21:200, num_entities2 in 1:21:200
 
-        # Test different starting levels
-        tree1 = ImplicitTree(num_entities1)
-        tree2 = ImplicitTree(num_entities2)
-        min_levels = tree1.levels < tree2.levels ? tree1.levels : tree2.levels
+            # Test different starting levels
+            tree1 = ImplicitTree(num_entities1)
+            tree2 = ImplicitTree(num_entities2)
+            min_levels = tree1.levels < tree2.levels ? tree1.levels : tree2.levels
 
-        for start_level in 1:min_levels - 1
-            bvs1 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities1])
-            bvs2 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities2])
+            for start_level in 1:min_levels - 1
+                bvs1 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities1])
+                bvs2 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities2])
 
-            # Brute force contact detection
-            brute_contacts = ImplicitBVH.IndexPair{Int}[]
-            for i in 1:length(bvs1)
-                for j in 1:length(bvs2)
-                    if ImplicitBVH.iscontact(bvs1[i], bvs2[j])
-                        push!(brute_contacts, (i, j))
+                # Brute force contact detection
+                brute_contacts = ImplicitBVH.IndexPair{Int}[]
+                for i in 1:length(bvs1)
+                    for j in 1:length(bvs2)
+                        if ImplicitBVH.iscontact(bvs1[i], bvs2[j])
+                            push!(brute_contacts, (i, j))
+                        end
                     end
                 end
+
+                # ImplicitBVH-based contact detection
+                bvh1 = BVH(bvs1, BBox{Float64})
+                bvh2 = BVH(bvs2, BBox{Float64})
+                traversal = traverse(bvh1, bvh2, alg, start_level1=start_level, start_level2=start_level)
+                bvh_contacts = traversal.contacts
+
+                # Ensure ImplicitBVH finds same contacts as checking all possible pairs
+                @test length(brute_contacts) == length(bvh_contacts)
+                @test all(brute_contact in bvh_contacts for brute_contact in brute_contacts)
             end
-
-            # ImplicitBVH-based contact detection
-            bvh1 = BVH(bvs1, BBox{Float64})
-            bvh2 = BVH(bvs2, BBox{Float64})
-            traversal = traverse(bvh1, bvh2, start_level)
-            bvh_contacts = traversal.contacts
-
-            # Ensure ImplicitBVH finds same contacts as checking all possible pairs
-            @test length(brute_contacts) == length(bvh_contacts)
-            @test all(brute_contact in bvh_contacts for brute_contact in brute_contacts)
         end
     end
 end
+
+
+
+
+for alg in (BFSTraversal(), LVTTraversal())
+    @testset "test_bvh_ray_$(alg)_traversal" begin
+        # Extensive ray tests
+        # Sphere for testing
+        p1 = Float64[0.7944654, 1.1890014, -9.944]
+        p2 = Float64[0.7944654, 1.1890014, 9.944]
+        p3 = Float64[1.0111626, 1.0111626, 9.944]
+
+        sphere = BSphere{Float64}(p1,p2,p3)
+        bvh = BVH([sphere], BBox{Float64})
+
+        test_x_point_range = (sphere.x[1] - sphere.r):1:(sphere.x[1] + sphere.r)
+        test_y_point_range = (sphere.x[2] - sphere.r):1:(sphere.x[2] + sphere.r)
+        test_z_point_range = (sphere.x[3] - sphere.r):1:(sphere.x[3] + sphere.r)
+
+        # Generate a matrix of points to test
+        points = [[[x; y; z] for x in test_x_point_range, y in test_y_point_range, z in test_z_point_range]...]
+        points = mapreduce(permutedims, vcat, points)'
+
+        # define test ray directions
+        x_plus_ray = [1,0,0] .* ones(3, size(points, 2))
+        x_minus_ray = [-1,0,0] .* ones(3, size(points, 2))
+        y_plus_ray = [0,1,0] .* ones(3, size(points, 2))
+        y_minus_ray = [0,-1,0] .* ones(3, size(points, 2))
+        z_plus_ray = [0,0,1] .* ones(3, size(points, 2))
+        z_minus_ray = [0,0,-1] .* ones(3, size(points, 2))
+
+        x_plus_traversal = traverse_rays(bvh, points, x_plus_ray, alg)
+        x_minus_traversal = traverse_rays(bvh, points, x_minus_ray, alg)
+        y_plus_traversal = traverse_rays(bvh, points, y_plus_ray, alg)
+        y_minus_traversal = traverse_rays(bvh, points, y_minus_ray, alg)
+        z_plus_traversal = traverse_rays(bvh, points, z_plus_ray, alg)
+        z_minus_traversal = traverse_rays(bvh, points, z_minus_ray, alg)
+
+        x_plus_contacts = x_plus_traversal.contacts
+        x_minus_contacts = x_minus_traversal.contacts
+        y_plus_contacts = y_plus_traversal.contacts
+        y_minus_contacts = y_minus_traversal.contacts
+        z_plus_contacts = z_plus_traversal.contacts
+        z_minus_contacts = z_minus_traversal.contacts
+
+        # Define BVH traversal contacts
+        x_plus_p_contacts = [contact[2] for contact in x_plus_contacts]
+        x_minus_p_contacts = [contact[2] for contact in x_minus_contacts]
+        y_plus_p_contacts = [contact[2] for contact in y_plus_contacts]
+        y_minus_p_contacts = [contact[2] for contact in y_minus_contacts]
+        z_plus_p_contacts = [contact[2] for contact in z_plus_contacts]
+        z_minus_p_contacts = [contact[2] for contact in z_minus_contacts]
+
+        # Positive ray in the x direction
+        # All points that lie to the left of the sphere center and in the circle in the yz plane
+        # should have a contact. Contacts to the right of the sphere center should only occur if the point is
+        # inside the sphere
+        x_plus_calculated_contacts = []
+        for i in 1:size(points, 2)
+            if points[1, i] <= sphere.x[1] && norm(points[2:3, i] .- sphere.x[2:3]) <= sphere.r
+                push!(x_plus_calculated_contacts, i)
+            elseif points[1, i] > sphere.x[1] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
+                push!(x_plus_calculated_contacts, i)
+            end
+        end
+
+        @test x_plus_p_contacts == x_plus_calculated_contacts
+
+        # Negative ray in the x direction
+        # All points that lie to the right of the sphere center and in the circle in the yz plane
+        # should have a contact. Contacts to the left of the sphere center should only occur if the point is
+        # inside the sphere
+        x_minus_calculated_contacts = []
+        for i in 1:size(points, 2)
+            if points[1, i] >= sphere.x[1] && norm(points[2:3, i] .- sphere.x[2:3]) <= sphere.r
+                push!(x_minus_calculated_contacts, i)
+            elseif points[1, i] < sphere.x[1] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
+                push!(x_minus_calculated_contacts, i)
+            end
+        end
+
+        @test x_minus_p_contacts == x_minus_calculated_contacts
+
+        # Positive ray in the y direction
+        # All points that lie below the sphere center and in the circle in the xz plane
+        # should have a contact. Contacts above the sphere center should only occur if the point is
+        # inside the sphere
+        y_plus_calculated_contacts = []
+        for i in 1:size(points, 2)
+            if points[2, i] <= sphere.x[2] && norm(points[[1,3], i] .- sphere.x[[1,3]]) <= sphere.r
+                push!(y_plus_calculated_contacts, i)
+            elseif points[2, i] > sphere.x[2] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
+                push!(y_plus_calculated_contacts, i)
+            end
+        end
+
+        @test y_plus_p_contacts == y_plus_calculated_contacts
+
+        # Negative ray in the y direction
+        # All points that lie above the sphere center and in the circle in the xz plane
+        # should have a contact. Contacts below the sphere center should only occur if the point is
+        # inside the sphere
+        y_minus_calculated_contacts = []
+        for i in 1:size(points, 2)
+            if points[2, i] >= sphere.x[2] && norm(points[[1,3], i] .- sphere.x[[1,3]]) <= sphere.r
+                push!(y_minus_calculated_contacts, i)
+            elseif points[2, i] < sphere.x[2] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
+                push!(y_minus_calculated_contacts, i)
+            end
+        end
+
+        @test y_minus_p_contacts == y_minus_calculated_contacts
+        
+        # Positive ray in the z direction
+        # All points that lie below the sphere center and in the circle in the xy plane 
+        # should have a contact. Contacts above the sphere center should only occur if the point is 
+        # inside the sphere
+        z_plus_calculated_contacts = []
+        for i in 1:size(points, 2)
+            if points[3, i] <= sphere.x[3] && norm(points[1:2, i] .- sphere.x[1:2]) <= sphere.r
+                push!(z_plus_calculated_contacts, i)
+            elseif points[3, i] > sphere.x[3] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
+                push!(z_plus_calculated_contacts, i)
+            end
+        end
+
+        @test z_plus_p_contacts == z_plus_calculated_contacts
+
+        # Negative ray in the z direction
+        # All points that lie above the sphere center and in the circle in the xy plane
+        # should have a contact. Contacts below the sphere center should only occur if the point is
+        # inside the sphere
+        z_minus_calculated_contacts = []
+        for i in 1:size(points, 2)
+            if points[3, i] >= sphere.x[3] && norm(points[1:2, i] .- sphere.x[1:2]) <= sphere.r
+                push!(z_minus_calculated_contacts, i)
+            elseif points[3, i] < sphere.x[3] && norm(points[1:3, i] .- sphere.x[1:3]) <= sphere.r
+                push!(z_minus_calculated_contacts, i)
+            end
+        end
+
+        @test z_minus_p_contacts == z_minus_calculated_contacts
+    end
+end
+
+
+
+
+@testset "bvh_bfs_vs_lvt_narrowing" begin
+
+    # Test the `narrow` function produces the same results for BFS and LVT traversals
+    Random.seed!(42)
+
+    # Single BVH with random spheres
+    for num_entities in 1:21:200
+        bvs = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities])
+        bvh = BVH(bvs)
+
+        bfs_traversal = traverse(bvh, BFSTraversal(), narrow=(bv1, bv2) -> bv1.morton < bv2.morton)
+        lvt_traversal = traverse(bvh, LVTTraversal(), narrow=(bv1, bv2) -> bv1.morton < bv2.morton)
+
+        bfs_contacts = sort(bfs_traversal.contacts)
+        lvt_contacts = sort(lvt_traversal.contacts)
+
+        @test bfs_contacts == lvt_contacts
+    end
+
+    # Pair of BVHs with random spheres
+    for num_entities1 in 1:21:200, num_entities2 in 1:21:200
+        bvs1 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities1])
+        bvs2 = map(BSphere, [6 * rand(3) .+ rand(3, 3) for _ in 1:num_entities2])
+        bvh1 = BVH(bvs1)
+        bvh2 = BVH(bvs2)
+
+        bfs_traversal = traverse(
+            bvh1, bvh2, BFSTraversal(),
+            narrow=(bv1, bv2) -> bv1.morton < bv2.morton,
+        )
+        lvt_traversal = traverse(
+            bvh1, bvh2, LVTTraversal(),
+            narrow=(bv1, bv2) -> bv1.morton < bv2.morton,
+        )
+
+        bfs_contacts = sort(bfs_traversal.contacts)
+        lvt_contacts = sort(lvt_traversal.contacts)
+
+        @test bfs_contacts == lvt_contacts
+    end
+end
+
+
 
 
 # GPU tests

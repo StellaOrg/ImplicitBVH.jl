@@ -346,7 +346,7 @@ function traverse_nodes_leaves_left!(bvh1, bvh2, src::AbstractGPUVector, dst::Ab
     kernel! = _traverse_nodes_leaves_left_gpu!(backend, block_size)
     kernel!(
         bvh1.tree, bvh2.tree,
-        bvh1.nodes, bvh2.leaves, bvh2.order,
+        bvh1.nodes, bvh2.leaves,
         src, dst, I(num_src), dst_offsets, I(idst_offsets),
         I(virtual_nodes_before1), I(num_above2),
         ndrange=num_blocks * block_size,
@@ -359,7 +359,7 @@ end
 
 @kernel cpu=false inbounds=true unsafe_indices=true function _traverse_nodes_leaves_left_gpu!(
     tree1, tree2,
-    @Const(nodes1), @Const(leaves2), @Const(order2),
+    @Const(nodes1), @Const(leaves2),
     @Const(src), dst, num_src, dst_offsets, idst_offsets,
     num_skips1, num_above2,
 )
@@ -387,15 +387,12 @@ end
     if index <= num_src
         # Extract implicit indices of BVH nodes to test
         implicit1, implicit2 = src[index]
-
         node1 = nodes1[implicit1 - num_skips1]
-
-        iorder2 = order2[implicit2 - num_above2]
-        leaf2 = leaves2[iorder2]
+        leaf2 = leaves2[implicit2 - num_above2]
 
         # If the two nodes are touching, expand BVTT with new possible contacts - i.e. pair
         # the nodes' children
-        if iscontact(node1, leaf2)
+        if iscontact(node1, leaf2.volume)
             # If a node's right child is virtual, don't add that check. Guaranteed to always have
             # at least one real child
 
@@ -450,7 +447,7 @@ function traverse_nodes_leaves_right!(bvh1, bvh2, src::AbstractGPUVector, dst::A
     kernel! = _traverse_nodes_leaves_right_gpu!(backend, block_size)
     kernel!(
         bvh1.tree, bvh2.tree,
-        bvh1.leaves, bvh2.nodes, bvh1.order,
+        bvh1.leaves, bvh2.nodes,
         src, dst, I(num_src), dst_offsets, I(idst_offsets),
         I(num_above1), I(virtual_nodes_before2),
         ndrange=num_blocks * block_size,
@@ -463,7 +460,7 @@ end
 
 @kernel cpu=false inbounds=true unsafe_indices=true function _traverse_nodes_leaves_right_gpu!(
     tree1, tree2,
-    @Const(leaves1), @Const(nodes2), @Const(order1),
+    @Const(leaves1), @Const(nodes2),
     @Const(src), dst, num_src, dst_offsets, idst_offsets,
     num_above1, num_skips2,
 )
@@ -491,15 +488,12 @@ end
     if index <= num_src
         # Extract implicit indices of BVH nodes to test
         implicit1, implicit2 = src[index]
-
-        iorder1 = order1[implicit1 - num_above1]
-        leaf1 = leaves1[iorder1]
-
+        leaf1 = leaves1[implicit1 - num_above1]
         node2 = nodes2[implicit2 - num_skips2]
 
         # If the two nodes are touching, expand BVTT with new possible contacts - i.e. pair
         # the nodes' children
-        if iscontact(leaf1, node2)
+        if iscontact(leaf1.volume, node2)
             # If a node's right child is virtual, don't add that check. Guaranteed to always have
             # at least one real child
 
@@ -534,7 +528,7 @@ end
 
 
 function traverse_leaves_pair!(bvh1, bvh2, src::AbstractGPUVector, contacts::AbstractGPUVector,
-                               num_src, dst_offsets, options)
+                               num_src, dst_offsets, narrow, options)
     # Traverse final level, only doing leaf-leaf checks
     I = get_index_type(options)
 
@@ -547,9 +541,10 @@ function traverse_leaves_pair!(bvh1, bvh2, src::AbstractGPUVector, contacts::Abs
 
     kernel! = _traverse_leaves_pair_gpu!(backend, block_size)
     kernel!(
-        bvh1.leaves, bvh2.leaves, bvh1.order, bvh2.order,
+        bvh1.leaves, bvh2.leaves,
         src, contacts, I(num_src), dst_offsets,
         I(num_above1), I(num_above2),
+        narrow,
         ndrange=num_blocks * block_size,
     )
 
@@ -559,10 +554,11 @@ end
 
 
 @kernel cpu=false inbounds=true unsafe_indices=true function _traverse_leaves_pair_gpu!(
-    @Const(leaves1), @Const(leaves2), @Const(order1), @Const(order2),
+    @Const(leaves1), @Const(leaves2),
     @Const(src), dst,
     num_src, dst_offsets,
     num_above1, num_above2,
+    narrow,
 )
     # Group (block) and local (thread) indices
     iblock = @index(Group, Linear)
@@ -587,17 +583,13 @@ end
     if index <= num_src
         # Extract implicit indices of BVH leaves to test
         implicit1, implicit2 = src[index]
-
-        iorder1 = order1[implicit1 - num_above1]
-        iorder2 = order2[implicit2 - num_above2]
-
-        leaf1 = leaves1[iorder1]
-        leaf2 = leaves2[iorder2]
+        leaf1 = leaves1[implicit1 - num_above1]
+        leaf2 = leaves2[implicit2 - num_above2]
 
         # If two leaves are touching, save in contacts
-        if iscontact(leaf1, leaf2)
+        if iscontact(leaf1.volume, leaf2.volume) && narrow(leaf1, leaf2)
             new_temp_offset = @atomic temp_offset[0x1] += 0x1
-            temp[new_temp_offset - 0x1 + 0x1] = (iorder1, iorder2)
+            temp[new_temp_offset - 0x1 + 0x1] = (leaf1.index, leaf2.index)
         end
     end
     @synchronize()

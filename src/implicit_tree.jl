@@ -94,6 +94,32 @@ end
 ImplicitTree(num_leaves::Integer) = ImplicitTree{typeof(num_leaves)}(num_leaves)
 
 
+# For each level in the tree, compute the number of virtual nodes that are skipped in memory to get
+# to an implicit index of a real node; that's the number of virtual nodes before that level.
+# Pre-computed on a CPU, then transferred to kernels
+function compute_skips!(skips, tree::ImplicitTree)
+
+    # Very small number of levels (e.g. a 32-level tree has over 4 billion leaves!)
+    AK.foreachindex(skips, block_size=128, max_tasks=1) do i
+        if i == 0
+            @inbounds skips[i] = 0
+        else
+            virtual_nodes_level = tree.virtual_leaves >> (tree.levels - (i - 1))
+            @inbounds skips[i] = 2 * virtual_nodes_level - count_ones(virtual_nodes_level)
+        end
+    end
+
+    skips
+end
+
+
+function compute_skips(bvh)
+    I = get_index_type(bvh)
+    skips = similar(bvh.nodes, I, bvh.tree.levels)
+    compute_skips!(skips, bvh.tree)
+end
+
+
 """
     memory_index(tree::ImplicitTree, implicit_index::Integer)
 

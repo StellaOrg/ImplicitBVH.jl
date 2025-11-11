@@ -14,11 +14,17 @@ using BenchmarkTools
 using Profile
 using PProf
 
+# using Metal: MtlArray
+
 
 # Types used
-const LeafType = BSphere{Float32}
-const NodeType = BBox{Float32}
+const FloatType = Float32
+const LeafType = BSphere{FloatType}
+const NodeType = BBox{FloatType}
 const MortonType = UInt32
+const IndexType = Int32
+const alg = LVTTraversal()
+options = BVHOptions(index=IndexType, morton=DefaultMortonAlgorithm(MortonType))
 
 
 # Load mesh and compute bounding spheres for each triangle. Can download mesh from:
@@ -28,32 +34,26 @@ display(mesh)
 @show Threads.nthreads()
 
 bounding_spheres = [LeafType(tri) for tri in mesh]
+# bounding_spheres = MtlArray(bounding_spheres)
 
 # Pre-compile BVH traversal
-bvh = BVH(bounding_spheres, NodeType, MortonType)
-@show traversal = traverse(bvh)
-
-# Print algorithmic efficiency
-eff = traversal.num_checks / (length(bounding_spheres) * length(bounding_spheres) / 2)
-println("Did $eff of the total checks needed for brute-force contact detection")
+bvh = BVH(bounding_spheres, NodeType, options=options)
+@show traversal = traverse(bvh, alg)
 
 # Benchmark BVH traversal anew
-println("BVH traversal with dynamic buffer resizing:")
-display(@benchmark(traverse(bvh), samples=100))
+println("BVH traversal:")
+display(@benchmark traverse(bvh, alg))
 
-# Benchmark BVH creation reusing previous cache
-println("BVH traversal without dynamic buffer resizing:")
-display(@benchmark(traverse(bvh, bvh.tree.levels ÷ 2, traversal), samples=100))
 
-# Collect a pprof profile
+# # Collect a pprof profile
 # Profile.clear()
 # @profile begin
-#     for _ in 1:1000
-#         traverse(bvh, bvh.tree.levels ÷ 2, traversal)
+#     for _ in 1:10
+#         traverse(bvh, alg)
 #     end
 # end
-
-# Export pprof profile and open interactive profiling web interface.
+# 
+# # Export pprof profile and open interactive profiling web interface.
 # pprof(; out="bvh_contact.pb.gz")
 
 

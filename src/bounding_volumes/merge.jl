@@ -44,10 +44,10 @@ Base.:+(a::BBox, b::BBox) = BBox(a, b)
 
 
 # Convert BSphere to BBox
-function BBox{T}(a::BSphere{T}) where T
+function BBox{T}(a::BSphere) where T
     lower = (a.x[1] - a.r, a.x[2] - a.r, a.x[3] - a.r)
     upper = (a.x[1] + a.r, a.x[2] + a.r, a.x[3] + a.r)
-    BBox(lower, upper)
+    BBox{T}(lower, upper)
 end
 
 function BBox(a::BSphere{T}) where T
@@ -55,16 +55,16 @@ function BBox(a::BSphere{T}) where T
 end
 
 # Merge two BSphere into enclosing BBox
-function BBox{T}(a::BSphere{T}, b::BSphere{T}) where T
+function BBox{T}(a::BSphere, b::BSphere) where T
     length = dist3(a.x, b.x)
 
     # a is enclosed within b
     if length + a.r <= b.r
-        return BBox(b)
+        return BBox{T}(b)
 
     # b is enclosed within a
     elseif length + b.r <= a.r
-        return BBox(a)
+        return BBox{T}(a)
 
     # Bounding spheres are not enclosed
     else
@@ -76,7 +76,7 @@ function BBox{T}(a::BSphere{T}, b::BSphere{T}) where T
                  maximum2(a.x[2] + a.r, b.x[2] + b.r),
                  maximum2(a.x[3] + a.r, b.x[3] + b.r))
 
-        return BBox(lower, upper)
+        return BBox{T}(lower, upper)
     end
 end
 

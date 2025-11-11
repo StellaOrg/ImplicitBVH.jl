@@ -96,7 +96,7 @@ function traverse_rays_nodes_range!(
 end
 
 
-function traverse_rays_leaves!(bvh, points, directions, src, intersections, num_src, ::Nothing, options)
+function traverse_rays_leaves!(bvh, points, directions, src, intersections, num_src, ::Nothing, narrow, options)
     # Traverse final level, only doing ray-leaf checks
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
@@ -106,6 +106,7 @@ function traverse_rays_leaves!(bvh, points, directions, src, intersections, num_
         num_intersections = traverse_rays_leaves_range!(
             bvh, points, directions,
             src, intersections, nothing,
+            narrow,
             (1, num_src),
         )
     else
@@ -122,6 +123,7 @@ function traverse_rays_leaves!(bvh, points, directions, src, intersections, num_
             tasks[i] = Threads.@spawn traverse_rays_leaves_range!(
                 bvh, points, directions,
                 src, view(intersections, istart:iend), view(num_written, i),
+                narrow,
                 (istart, iend),
             )
         end
@@ -145,7 +147,7 @@ end
 
 
 function traverse_rays_leaves_range!(
-    bvh, points, directions, src, intersections, num_written, irange
+    bvh, points, directions, src, intersections, num_written, narrow, irange
 )
     # Check src[irange[1]:irange[2]] and write to dst[1:num_dst]; dst should be given as a view
     num_dst = 0
@@ -158,15 +160,14 @@ function traverse_rays_leaves_range!(
         # Extract implicit indices of BVH leaves to test
         implicit, iray = src[i]
 
-        iorder = bvh.order[implicit - num_above]
-        leaf = bvh.leaves[iorder]
+        leaf = bvh.leaves[implicit - num_above]
 
         p = @view points[:, iray]
         d = @view directions[:, iray]
 
         # If leaf-ray intersection, save in intersections
-        if isintersection(leaf, p, d)
-            intersections[num_dst + 1] = (iorder, iray)
+        if isintersection(leaf.volume, p, d) && narrow(leaf, p, d)
+            intersections[num_dst + 1] = (leaf.index, iray)
             num_dst += 1
         end
     end

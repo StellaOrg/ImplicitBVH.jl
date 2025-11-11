@@ -1,7 +1,7 @@
 """
     $(TYPEDEF)
 
-Axis-aligned bounding box, highly optimised for computing bounding volumes for triangles and
+Axis-aligned bounding box, optimised for computing bounding volumes for triangles and
 merging into larger bounding volumes.
 
 Can also be constructed from two spheres to e.g. allow merging [`BSphere`](@ref) leaves into
@@ -51,6 +51,8 @@ function BBox(lo::AbstractVector, up::AbstractVector)
     BBox{eltype(lo)}(lo, up)
 end
 
+BBox{T}(x::BBox) where T = BBox{T}(x.lo, x.up)
+BBox(x::BBox{T}) where T = BBox{T}(x)
 
 
 # Constructors from triangles

@@ -134,7 +134,7 @@ end
 
 
 
-function traverse_leaves!(bvh, src, contacts, num_src, num_written, options)
+function traverse_leaves!(bvh, src, contacts, num_src, num_written, narrow, options)
     # Traverse final level, only doing leaf-leaf checks
 
     # Split computation into contiguous ranges of minimum 100 elements each; if only single thread
@@ -144,6 +144,7 @@ function traverse_leaves!(bvh, src, contacts, num_src, num_written, options)
         num_contacts = traverse_leaves_range!(
             bvh,
             src, view(contacts, :), nothing,
+            narrow,
             1:num_src,
         )
         return src, contacts, num_contacts
@@ -156,6 +157,7 @@ function traverse_leaves!(bvh, src, contacts, num_src, num_written, options)
             traverse_leaves_range!(
                 bvh,
                 src, view(contacts, istart:iend), view(num_written, itask),
+                narrow,
                 irange,
             )
         end
@@ -180,7 +182,7 @@ end
 
 
 function traverse_leaves_range!(
-    bvh, src, contacts, num_written, irange
+    bvh, src, contacts, num_written, narrow, irange
 )
     # Check src[irange[1]:irange[2]] and write to dst[1:num_dst]
     num_dst = 0
@@ -193,19 +195,16 @@ function traverse_leaves_range!(
 
         # Extract implicit indices of BVH leaves to test
         implicit1, implicit2 = src[i]
-
-        iorder1 = bvh.order[implicit1 - num_above]
-        iorder2 = bvh.order[implicit2 - num_above]
-
-        leaf1 = bvh.leaves[iorder1]
-        leaf2 = bvh.leaves[iorder2]
+        leaf1 = bvh.leaves[implicit1 - num_above]
+        leaf2 = bvh.leaves[implicit2 - num_above]
 
         # If two leaves are touching, save in contacts
-        if iscontact(leaf1, leaf2)
-
-            # While it's guaranteed that implicit1 < implicit2, the bvh.order may not be
-            # ascending, so we add this comparison to output ordered contact indices
-            contacts[num_dst + 1] = iorder1 < iorder2 ? (iorder1, iorder2) : (iorder2, iorder1)
+        if iscontact(leaf1.volume, leaf2.volume) && narrow(leaf1, leaf2)
+            contacts[num_dst + 1] = if leaf1.index > leaf2.index
+                (leaf2.index, leaf1.index)
+            else
+                (leaf1.index, leaf2.index)
+            end
             num_dst += 1
         end
     end

@@ -421,13 +421,11 @@ function traverse_nodes_leaves_left_range!(
         implicit1, implicit2 = src[i]
 
         node1 = bvh1.nodes[implicit1 - num_skips1]
-
-        iorder2 = bvh2.order[implicit2 - num_above2]
-        leaf2 = bvh2.leaves[iorder2]
+        leaf2 = bvh2.leaves[implicit2 - num_above2]
 
         # If the two nodes are touching, expand BVTT with new possible contacts - i.e. pair
         # the nodes' children
-        if iscontact(node1, leaf2)
+        if iscontact(node1, leaf2.volume)
             # If a node's right child is virtual, don't add that check. Guaranteed to always have
             # at least one real child
 
@@ -529,14 +527,12 @@ function traverse_nodes_leaves_right_range!(
         # Extract implicit indices of BVH nodes to test
         implicit1, implicit2 = src[i]
 
-        iorder1 = bvh1.order[implicit1 - num_above1]
-        leaf1 = bvh1.leaves[iorder1]
-
+        leaf1 = bvh1.leaves[implicit1 - num_above1]
         node2 = bvh2.nodes[implicit2 - num_skips2]
 
         # If the two nodes are touching, expand BVTT with new possible contacts - i.e. pair
         # the nodes' children
-        if iscontact(leaf1, node2)
+        if iscontact(leaf1.volume, node2)
             # If a node's right child is virtual, don't add that check. Guaranteed to always have
             # at least one real child
 
@@ -564,7 +560,7 @@ end
 
 function traverse_leaves_pair!(
     bvh1, bvh2, src, contacts, num_src, num_written,
-    options,
+    narrow, options,
 )
     # Traverse final level, only doing leaf-leaf checks
 
@@ -575,6 +571,7 @@ function traverse_leaves_pair!(
         num_contacts = traverse_leaves_pair_range!(
             bvh1, bvh2,
             src, view(contacts, :), nothing,
+            narrow,
             1:num_src,
         )
         return src, contacts, num_contacts
@@ -589,6 +586,7 @@ function traverse_leaves_pair!(
             traverse_leaves_pair_range!(
                 bvh1, bvh2,
                 src, view(contacts, istart:iend), view(num_written, itask),
+                narrow,
                 irange,
             )
         end
@@ -614,7 +612,7 @@ end
 
 
 function traverse_leaves_pair_range!(
-    bvh1, bvh2, src, contacts, num_written, irange
+    bvh1, bvh2, src, contacts, num_written, narrow, irange
 )
     # Check src[irange[1]:irange[2]] and write to dst[1:num_dst]; dst should be given as a view
     num_dst = 0
@@ -627,16 +625,12 @@ function traverse_leaves_pair_range!(
     @inbounds for i in irange
         # Extract implicit indices of BVH leaves to test
         implicit1, implicit2 = src[i]
-
-        iorder1 = bvh1.order[implicit1 - num_above1]
-        iorder2 = bvh2.order[implicit2 - num_above2]
-
-        leaf1 = bvh1.leaves[iorder1]
-        leaf2 = bvh2.leaves[iorder2]
+        leaf1 = bvh1.leaves[implicit1 - num_above1]
+        leaf2 = bvh2.leaves[implicit2 - num_above2]
 
         # If two leaves are touching, save in contacts
-        if iscontact(leaf1, leaf2)
-            contacts[num_dst + 1] = (iorder1, iorder2)
+        if iscontact(leaf1.volume, leaf2.volume) && narrow(leaf1, leaf2)
+            contacts[num_dst + 1] = (leaf1.index, leaf2.index)
             num_dst += 1
         end
     end
@@ -649,4 +643,3 @@ function traverse_leaves_pair_range!(
         return nothing
     end
 end
-
