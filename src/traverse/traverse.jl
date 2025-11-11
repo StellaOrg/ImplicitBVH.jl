@@ -121,6 +121,7 @@ end
     traverse(
         bvh::BVH, alg::TraversalAlgorithm=LVTTraversal();
         start_level::Int=default_start_level(bvh, alg),
+        narrow=(bv1, bv2) -> true,
         cache::Union{Nothing, BVHTraversal}=nothing,
         options=BVHOptions(),
     )::BVHTraversal
@@ -129,6 +130,7 @@ end
         bvh1::BVH, bvh2::BVH, alg::TraversalAlgorithm=LVTTraversal();
         start_level1::Int=default_start_level(bvh1, alg),
         start_level2::Int=default_start_level(bvh2, alg),
+        narrow=(bv1, bv2) -> true,
         cache::Union{Nothing, BVHTraversal}=nothing,
         options=BVHOptions(),
     )::BVHTraversal
@@ -136,6 +138,10 @@ end
 Traverse `bvh` downwards from `start_level`, returning all contacting bounding volume leaves, using
 the traversal algorithm `alg` ([`TraversalAlgorithm`](@ref)). The returned [`BVHTraversal`](@ref)
 also contains two buffers that can be reused on future traversals as cache to avoid reallocations.
+
+The optional `narrow` function can be used to perform a custom narrow-phase test between two
+bounding volumes `bv1` and `bv2` before registering a contact. By default, all bounding volume
+pairs reaching the narrow-phase are considered contacting.
 
 # Examples
 

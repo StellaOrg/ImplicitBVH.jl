@@ -4,6 +4,7 @@
         points::AbstractMatrix, directions::AbstractMatrix,
         alg::TraversalAlgorithm=LVTTraversal();
         start_level::Int=1,
+        narrow=(bv, p, d) -> true,
         cache::Union{Nothing, BVHTraversal}=nothing,
         options=BVHOptions(),
     )::BVHTraversal
@@ -18,6 +19,10 @@ Only forward rays are counted - i.e. the direction matters.
 
 The returned [`BVHTraversal`](@ref) `.contacts` field will contain the index pairs
 `(iboundingvolume, iray)` following the indices in `bvh.leaves` and `axes(points, 2)`.
+
+The optional `narrow` function can be used to perform a custom narrow-phase test between a bounding
+volume `bv`, a ray point `p` and direction `d` before registering a contact. By default, all
+bounding volume and ray pairs reaching the narrow-phase are considered contacting.
 
 # Examples
 
