@@ -78,6 +78,7 @@ function BSphere{T}(p1, p2, p3) where T
                   T(0.5) * (lower[2] + upper[2]),
                   T(0.5) * (lower[3] + upper[3]))
         radius = dist3(centre, upper)
+        return BSphere(centre, radius)
     else
         s = (abab * acac - acac * abac) / d
         t = (acac * abab - abab * abac) / d
@@ -87,25 +88,27 @@ function BSphere{T}(p1, p2, p3) where T
                       T(0.5) * (a[2] + c[2]),
                       T(0.5) * (a[3] + c[3]))
             radius = dist3(centre, a)
+            return BSphere(centre, radius)
         elseif t <= zero(T)
             centre = (T(0.5) * (a[1] + b[1]),
                       T(0.5) * (a[2] + b[2]),
                       T(0.5) * (a[3] + b[3]))
             radius = dist3(centre, a)
+            return BSphere(centre, radius)
         elseif s + t >= one(T)
             centre = (T(0.5) * (b[1] + c[1]),
                       T(0.5) * (b[2] + c[2]),
                       T(0.5) * (b[3] + c[3]))
             radius = dist3(centre, b)
+            return BSphere(centre, radius)
         else
             centre = (a[1] + s * (b[1] - a[1]) + t * (c[1] - a[1]),
                       a[2] + s * (b[2] - a[2]) + t * (c[2] - a[2]),
                       a[3] + s * (b[3] - a[3]) + t * (c[3] - a[3]))
             radius = dist3(centre, a)
+            return BSphere(centre, radius)
         end
     end
-
-    BSphere(centre, radius)
 end
 
 
