@@ -1,6 +1,6 @@
 name = "ImplicitBVH"
 uuid = "932a18dc-bb55-4cd5-bdd6-1368ec9cea29"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Andrei Leonard Nicusan <leonard@evophase.co.uk> and contributors"]
 
 [deps]
