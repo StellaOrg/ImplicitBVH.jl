@@ -38,7 +38,13 @@ function traverse_nodes!(
 
         # Each task may have written fewer contacts than their full allocated region; copy them
         # back into src (we don't need src anymore) contiguously, in parallel
-        AK.accumulate!(+, view(num_written, 1:tp.num_tasks), init=0, max_tasks=1)
+        alg = if get_backend(num_written) isa CPU
+            AK.CPUThreads.Partitioned(max_tasks=1)
+        else
+            AK.ScanPrefixes()
+        end
+        
+        AK.accumulate!(+, view(num_written, 1:tp.num_tasks), init=0, alg=alg)
         num_dst = num_written[tp.num_tasks]
 
         # Make sure we have enough space in src, it may have been smaller than dst
@@ -164,7 +170,13 @@ function traverse_leaves!(bvh, src, contacts, num_src, num_written, narrow, opti
 
         # Each task may have written fewer contacts than their full allocated region; copy them
         # back into src (we don't need src anymore) contiguously, in parallel
-        AK.accumulate!(+, view(num_written, 1:tp.num_tasks), init=0, max_tasks=1)
+        alg = if get_backend(num_written) isa CPU
+            AK.CPUThreads.Partitioned(max_tasks=1)
+        else
+            AK.ScanPrefixes()
+        end
+
+        AK.accumulate!(+, view(num_written, 1:tp.num_tasks), init=0, alg=alg)
         num_contacts = num_written[tp.num_tasks]
         AK.itask_partition(tp) do itask, irange
             istart = irange.start

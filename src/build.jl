@@ -244,12 +244,19 @@ function BVH(
     # Compute morton codes for the bounding volumes
     morton_encode!(bounding_volumes_wrapped, options)
 
+    alg = if get_backend(bounding_volumes_wrapped) isa CPU
+        AK.CPUThreads.SampleSort(
+            max_tasks=options.num_threads, 
+            min_elems=options.min_sorts_per_thread,
+        )
+    else
+        AK.MergeSort(block_size=options.block_size)
+    end
+
     # Sort bounding volumes along the Z-curve - closer objects have closer Morton codes
     AK.sort!(
         bounding_volumes_wrapped, by=bv->bv.morton,
-        max_tasks=options.num_threads,
-        min_elems=options.min_sorts_per_thread,
-        block_size=options.block_size,
+        alg=alg,
     )
 
     # Pre-allocate vector of bounding volumes for the real nodes above the bottom level
@@ -411,7 +418,8 @@ function aggregate_last_level_kernel!(
     start_pos, num_nodes_next,
 )
     AK.foreachindex(
-        irange, backend,
+        irange;
+        backend=backend,
         block_size=options.block_size,
         max_tasks=options.num_threads,
         min_elems=options.min_boundings_per_thread,
@@ -490,7 +498,8 @@ function aggregate_level_kernel!(
     start_pos, start_pos_next, num_nodes_next,
 )
     AK.foreachindex(
-        irange, backend,
+        irange;
+        backend=backend,
         block_size=options.block_size,
         max_tasks=options.num_threads,
         min_elems=options.min_boundings_per_thread,
