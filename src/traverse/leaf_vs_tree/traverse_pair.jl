@@ -52,7 +52,7 @@ function traverse_lvt(
     @argcheck AK.get_backend(bvh1.nodes) === AK.get_backend(bvh2.nodes)
 
     # Allocate buffer for number of contacts to be written, one for each thread
-    if AK.get_backend(bvh1.nodes) isa typeof(AK.CPU_BACKEND)
+    if AK.get_backend(bvh1.nodes) isa CPU
         # CPU backend - one per thread (one thread handles multiple input bounding volumes)
         npadding = div(64, sizeof(I), RoundUp)
         thread_ncontacts_length = npadding * options.num_threads
@@ -74,7 +74,7 @@ function traverse_lvt(
     end
 
     # On CPUs take every npadding-th element to avoid false sharing
-    if AK.get_backend(bvh1.nodes) isa typeof(AK.CPU_BACKEND)
+    if AK.get_backend(bvh1.nodes) isa CPU
         thread_ncontacts = view(reshape(thread_ncontacts_raw, npadding, :), 1, :)
     else
         thread_ncontacts = thread_ncontacts_raw
@@ -85,7 +85,18 @@ function traverse_lvt(
     traverse_contacts_lvt!(bvh1, bvh2, start_level2, thread_ncontacts, nothing, narrow, flip, options)
 
     # Accumulate numbers of contacts to get thread offsets to write contacts based on
-    AK.accumulate!(+, thread_ncontacts, init=I(0), max_tasks=1, block_size=options.block_size)
+    alg = if get_backend(thread_ncontacts) isa CPU
+        AK.CPUThreads.Partitioned(
+            max_tasks=options.num_threads,
+            min_elems=options.min_traversals_per_thread,
+        )
+    elseif isnothing(options.block_size)
+        AK.Auto()
+    else
+        AK.ScanPrefixes(block_size=options.block_size)
+    end
+
+    AK.accumulate!(+, thread_ncontacts, init=I(0), alg=alg)
 
     # Allocate contacts vector
     total_contacts = @allowscalar thread_ncontacts[end]
@@ -128,7 +139,7 @@ function traverse_contacts_lvt!(
     backend = AK.get_backend(bvh1.nodes)
     num_checks = length(bvh1.leaves)
 
-    if backend isa typeof(AK.CPU_BACKEND)
+    if backend isa CPU
         AK.itask_partition(num_checks, options.num_threads, options.min_traversals_per_thread) do itask, irange
             I = get_index_type(bvh1)
             stack = SimpleMVector{32, I}(undef)
@@ -150,7 +161,11 @@ function traverse_contacts_lvt!(
         end
     else
         # GPU implementation
-        AK.foreachindex(1:num_checks, backend, block_size=options.block_size) do i
+        AK.foreachindex(
+            1:num_checks;
+            backend=backend,
+            block_size=_foreachindex_block_size(backend, options.block_size),
+        ) do i
             I = get_index_type(bvh1)
             stack = SimpleMVector{32, I}(undef)
             iwrite = if isnothing(contacts)

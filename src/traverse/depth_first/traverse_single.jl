@@ -20,7 +20,7 @@ function traverse(
     end
 
     # Allocate buffer for number of contacts to be written, one for each thread
-    if AK.get_backend(bvh.nodes) isa typeof(AK.CPU_BACKEND)
+    if AK.get_backend(bvh.nodes) isa CPU
         # CPU backend - one per thread (one thread handles multiple start_level pairs here)
         padding = div(64, sizeof(I), RoundUp)
         thread_ncontacts_length = padding * options.num_threads
@@ -47,7 +47,18 @@ function traverse(
     traverse_contacts!(bvh, start_level, thread_ncontacts, nothing, options)
 
     # Accumulate numbers of contacts to get thread offsets to write contacts based on
-    AK.accumulate!(+, @view(thread_ncontacts[1, :]), init=I(0), max_tasks=1, block_size=options.block_size)
+    alg = if get_backend(thread_ncontacts) isa CPU
+        AK.CPUThreads.Partitioned(
+            max_tasks=options.num_threads,
+            min_elems=options.min_traversals_per_thread,
+        )
+    elseif isnothing(options.block_size)
+        AK.Auto()
+    else
+        AK.ScanPrefixes(block_size=options.block_size)
+    end
+
+    AK.accumulate!(+, @view(thread_ncontacts[1, :]), init=I(0), alg=alg)
 
     # Allocate contacts vector
     total_contacts = @allowscalar thread_ncontacts[1, end]
@@ -80,7 +91,7 @@ function traverse_contacts!(
     options,
 )
     # Pre-compute number of skips to do in memory for each level
-    skips = compute_skips(bvh)
+    skips = compute_skips(bvh, options)
 
     # Compute number of initial checks at the start_level
     level_nodes = pow2(start_level - 1)
@@ -88,7 +99,7 @@ function traverse_contacts!(
     num_checks = compute_num_checks(bvh, start_level)
 
     backend = AK.get_backend(bvh.nodes)
-    if backend isa typeof(AK.CPU_BACKEND)
+    if backend isa CPU
         AK.itask_partition(num_checks, options.num_threads) do itask, irange
 
             I = get_index_type(bvh)
@@ -131,7 +142,11 @@ function traverse_contacts!(
         end
     else
         # GPU implementation
-        AK.foreachindex(1:num_checks, backend, block_size=options.block_size) do i
+        AK.foreachindex(
+            1:num_checks;
+            backend=backend,
+            block_size=_foreachindex_block_size(backend, options.block_size),
+        ) do i
             I = get_index_type(bvh)
 
             # Stack buffer of contact pairs - hardcoded for at most 32 levels deep (1 level per

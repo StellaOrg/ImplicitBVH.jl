@@ -21,15 +21,24 @@ function _compute_extrema(bounding_volumes::AbstractVector, options)
     # Get numeric type of the inner bounding volume
     T = eltype(eltype(bounding_volumes))
 
+    alg = if get_backend(bounding_volumes) isa CPU
+        AK.CPUThreads.Partitioned(
+            max_tasks=options.num_threads,
+            min_elems=options.min_mortons_per_thread,
+        )
+    elseif isnothing(options.block_size)
+        AK.Auto()
+    else
+        AK.BlockReduce(block_size=options.block_size)
+    end
+    
     xyzmin = AK.mapreduce(
         bv -> center(bv.volume),    # Take the centre of each bounding volume
         min_centers,                # Reduce to the 3D minimum
         bounding_volumes,
         init=(floatmax(T), floatmax(T), floatmax(T)),
         neutral=(floatmax(T), floatmax(T), floatmax(T)),
-        max_tasks=options.num_threads,
-        min_elems=options.min_mortons_per_thread,
-        block_size=options.block_size,
+        alg=alg,
     )
 
     xyzmax = AK.mapreduce(
@@ -38,9 +47,7 @@ function _compute_extrema(bounding_volumes::AbstractVector, options)
         bounding_volumes,
         init=(floatmin(T), floatmin(T), floatmin(T)),
         neutral=(floatmin(T), floatmin(T), floatmin(T)),
-        max_tasks=options.num_threads,
-        min_elems=options.min_mortons_per_thread,
-        block_size=options.block_size,
+        alg=alg,
     )
 
     xyzmin, xyzmax

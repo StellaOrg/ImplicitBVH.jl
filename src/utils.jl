@@ -7,6 +7,14 @@ settings.
 An exemplar of an index (e.g. `Int32(0)`) is used to deduce the types of indices used in the BVH
 building ([`ImplicitTree`](@ref), order) and traversal ([`IndexPair`](@ref)).
 
+On CPUs, AcceleratedKernels algorithms use `num_threads` and the corresponding
+`min_*_per_thread` threshold. Contact-offset scans use `min_traversals_per_thread`.
+
+On GPUs, `block_size=nothing` selects `AcceleratedKernels.Auto()` for sorting,
+reductions and scans. Set an integer to choose these algorithms with an explicit
+block size. With `block_size=nothing`, `foreachindex` loops use the backend's maximum
+one-dimensional workgroup size; custom traversal kernels fall back to 256.
+
 # Methods
     BVHOptions(;
 
@@ -18,20 +26,20 @@ building ([`ImplicitTree`](@ref), order) and traversal ([`IndexPair`](@ref)).
 
         # CPU threading
         num_threads::Int                    = Threads.nthreads(),
-        min_mortons_per_thread::Int         = 100,
-        min_sorts_per_thread::Int           = 100,
-        min_boundings_per_thread::Int       = 100,
+        min_mortons_per_thread::Int         = 8192,
+        min_sorts_per_thread::Int           = 2048,
+        min_boundings_per_thread::Int       = 8192,
         min_traversals_per_thread::Int      = 100,
 
         # GPU scheduling
-        block_size::Int                     = 256,
+        block_size::Union{Nothing, Int}      = nothing,
     ) where {I <: Integer, M}
 
 # Fields
     $(TYPEDFIELDS)
 
 """
-struct BVHOptions{I <: Integer, M}
+struct BVHOptions{I <: Integer, M, B <: Union{Nothing, Int}}
 
     # Example index from which to deduce type
     index_exemplar::I
@@ -47,7 +55,7 @@ struct BVHOptions{I <: Integer, M}
     min_traversals_per_thread::Int
 
     # GPU scheduling
-    block_size::Int
+    block_size::B
 end
 
 
@@ -61,13 +69,13 @@ function BVHOptions(;
 
     # CPU threading
     num_threads::Int                    = Threads.nthreads(),
-    min_mortons_per_thread::Int         = 100,
-    min_sorts_per_thread::Int           = 100,
-    min_boundings_per_thread::Int       = 100,
+    min_mortons_per_thread::Int         = 8192,
+    min_sorts_per_thread::Int           = 2048,
+    min_boundings_per_thread::Int       = 8192,
     min_traversals_per_thread::Int      = 100,
 
     # GPU scheduling
-    block_size::Int                     = 256,
+    block_size::Union{Nothing, Int}    = nothing,
 ) where {I <: Integer, M}
 
     # Correctness checks
@@ -76,7 +84,7 @@ function BVHOptions(;
     @argcheck min_sorts_per_thread > 0
     @argcheck min_boundings_per_thread > 0
     @argcheck min_traversals_per_thread > 0
-    @argcheck block_size > 0
+    isnothing(block_size) || @argcheck block_size > 0
 
     index_exemplar = index isa Type ? zero(I) : index
 
@@ -92,6 +100,19 @@ function BVHOptions(;
     )
 end
 
+
+function _foreachindex_block_size(backend, block_size::Int)
+    block_size
+end
+
+
+function _foreachindex_block_size(backend, ::Nothing)
+    backend isa CPU && return 1
+    min(
+        KernelAbstractions.KI.max_work_group_size(backend),
+        KernelAbstractions.KI.max_work_group_dims(backend)[1],
+    )
+end
 
 
 # Get pair of children indices of nodes in a perfect binary tree

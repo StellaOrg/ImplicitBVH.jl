@@ -117,9 +117,13 @@ end
 
 function fill_initial_bvtt_rays!(bvtt1, level_nodes, num_real, num_rays, options)
     backend = get_backend(bvtt1)
-    if backend isa GPU
+    if !(backend isa CPU)
         # GPU version with the two for loops (see CPU) linearised
-        AK.foreachindex(1:num_real * num_rays, backend, block_size=options.block_size) do i
+        AK.foreachindex(
+            1:num_real * num_rays;
+            backend=backend,
+            block_size=_foreachindex_block_size(backend, options.block_size),
+        ) do i
             irow, icol = divrem(i - 1, num_rays)
             bvtt1[i] = (irow + level_nodes, icol + 1)
         end

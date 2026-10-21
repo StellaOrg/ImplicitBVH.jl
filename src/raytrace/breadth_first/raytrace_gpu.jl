@@ -6,7 +6,7 @@ function traverse_rays_nodes!(bvh, points, directions, src, dst, num_src, dst_of
     virtual_nodes_level = bvh.tree.virtual_leaves >> (bvh.tree.levels - (level - 1))
     virtual_nodes_before = 2 * virtual_nodes_level - count_ones(virtual_nodes_level)
 
-    block_size = options.block_size
+    block_size = something(options.block_size, 256)
     num_blocks = (num_src + block_size - 1) ÷ block_size
     backend = get_backend(src)
 
@@ -36,8 +36,8 @@ end
 
     # At most 2N sprouted checks from N src
     temp = @localmem eltype(dst) (0x2 * block_size,)
-    temp_offset = @localmem typeof(iblock) (1,)
-    block_dst_offset = @localmem typeof(iblock) (1,)
+    temp_offset = @localmem eltype(dst_offsets) (1,)
+    block_dst_offset = @localmem eltype(dst_offsets) (1,)
 
     # Write the initial offset for this block as zero. This will be atomically incremented as new
     # pairs are written to temp
@@ -105,7 +105,7 @@ function traverse_rays_leaves!(
     I = get_index_type(options)
     num_above = pow2(bvh.tree.levels - 1) - 1
 
-    block_size = options.block_size
+    block_size = something(options.block_size, 256)
     num_blocks = (num_src + block_size - 1) ÷ block_size
     backend = get_backend(src)
 
@@ -135,8 +135,8 @@ end
 
     # At most N sprouted checks from N src
     temp = @localmem eltype(dst) (block_size,)
-    temp_offset = @localmem typeof(iblock) (1,)
-    block_dst_offset = @localmem typeof(iblock) (1,)
+    temp_offset = @localmem eltype(dst_offsets) (1,)
+    block_dst_offset = @localmem eltype(dst_offsets) (1,)
 
     # Write the initial offset for this block as zero. This will be atomically incremented as new
     # pairs are written to temp
