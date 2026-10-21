@@ -65,7 +65,7 @@ function _morton_encode!(bounding_volumes, alg::DefaultMortonAlgorithm, mins, ma
     # Parallelise on CPU / GPU
     AK.foreachindex(
         bounding_volumes,
-        block_size=options.block_size,
+        block_size=_foreachindex_block_size(get_backend(bounding_volumes), options.block_size),
         max_tasks=options.num_threads,
         min_elems=options.min_mortons_per_thread,
     ) do i

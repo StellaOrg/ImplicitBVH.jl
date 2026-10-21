@@ -59,7 +59,12 @@ function traverse_rays(
     traverse_rays_lvt!(bvh, points, directions, start_level, thread_ncontacts, nothing, narrow, options)
 
     alg = if get_backend(thread_ncontacts) isa CPU
-        AK.CPUThreads.Partitioned(max_tasks=1)
+        AK.CPUThreads.Partitioned(
+            max_tasks=options.num_threads,
+            min_elems=options.min_traversals_per_thread,
+        )
+    elseif isnothing(options.block_size)
+        AK.Auto()
     else
         AK.ScanPrefixes(block_size=options.block_size)
     end
@@ -140,7 +145,11 @@ function traverse_rays_lvt!(
         end
     else
         # GPU implementation
-        AK.foreachindex(1:num_checks, backend, block_size=options.block_size) do i
+        AK.foreachindex(
+            1:num_checks;
+            backend=backend,
+            block_size=_foreachindex_block_size(backend, options.block_size),
+        ) do i
             I = get_index_type(bvh)
             T = eltype(eltype(bvh.leaves))
             stack = SimpleMVector{32, I}(undef)

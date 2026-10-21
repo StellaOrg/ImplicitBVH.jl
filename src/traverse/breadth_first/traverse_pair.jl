@@ -197,9 +197,13 @@ end
 
 function fill_initial_bvtt_pair!(bvtt1, level_nodes1, num_real1, level_nodes2, num_real2, options)
     backend = get_backend(bvtt1)
-    if backend isa GPU
+    if !(backend isa CPU)
         # GPU version with the two for loops (see CPU) linearised
-        AK.foreachindex(1:num_real1 * num_real2, backend, block_size=options.block_size) do i
+        AK.foreachindex(
+            1:num_real1 * num_real2;
+            backend=backend,
+            block_size=_foreachindex_block_size(backend, options.block_size),
+        ) do i
             irow, icol = divrem(i - 1, num_real2)
             bvtt1[i] = (irow + level_nodes1, icol + level_nodes2)
         end

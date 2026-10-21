@@ -48,7 +48,12 @@ function traverse(
 
     # Accumulate numbers of contacts to get thread offsets to write contacts based on
     alg = if get_backend(thread_ncontacts) isa CPU
-        AK.CPUThreads.Partitioned(max_tasks=1)
+        AK.CPUThreads.Partitioned(
+            max_tasks=options.num_threads,
+            min_elems=options.min_traversals_per_thread,
+        )
+    elseif isnothing(options.block_size)
+        AK.Auto()
     else
         AK.ScanPrefixes(block_size=options.block_size)
     end
@@ -86,7 +91,7 @@ function traverse_contacts!(
     options,
 )
     # Pre-compute number of skips to do in memory for each level
-    skips = compute_skips(bvh)
+    skips = compute_skips(bvh, options)
 
     # Compute number of initial checks at the start_level
     level_nodes = pow2(start_level - 1)
@@ -137,7 +142,11 @@ function traverse_contacts!(
         end
     else
         # GPU implementation
-        AK.foreachindex(1:num_checks, backend, block_size=options.block_size) do i
+        AK.foreachindex(
+            1:num_checks;
+            backend=backend,
+            block_size=_foreachindex_block_size(backend, options.block_size),
+        ) do i
             I = get_index_type(bvh)
 
             # Stack buffer of contact pairs - hardcoded for at most 32 levels deep (1 level per

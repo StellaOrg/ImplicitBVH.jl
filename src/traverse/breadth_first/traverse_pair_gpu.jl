@@ -10,7 +10,7 @@ function traverse_nodes_pair!(bvh1, bvh2, src::AbstractGPUVector, dst::AbstractG
     virtual_nodes_level2 = bvh2.tree.virtual_leaves >> (bvh2.tree.levels - (level2 - 1))
     virtual_nodes_before2 = 2 * virtual_nodes_level2 - count_ones(virtual_nodes_level2)
 
-    block_size = options.block_size
+    block_size = something(options.block_size, 256)
     num_blocks = (num_src + block_size - 1) ÷ block_size
     backend = get_backend(src)
 
@@ -45,8 +45,8 @@ end
 
     # At most 4N sprouted checks from N src
     temp = @localmem eltype(dst) (0x4 * block_size,)
-    temp_offset = @localmem typeof(iblock) (1,)
-    block_dst_offset = @localmem typeof(iblock) (1,)
+    temp_offset = @localmem eltype(dst_offsets) (1,)
+    block_dst_offset = @localmem eltype(dst_offsets) (1,)
 
     # Write the initial offset for this block as zero. This will be atomically incremented as new
     # pairs are written to temp
@@ -131,7 +131,7 @@ function traverse_nodes_left!(bvh1, bvh2, src::AbstractGPUVector, dst::AbstractG
     virtual_nodes_level2 = bvh2.tree.virtual_leaves >> (bvh2.tree.levels - (level2 - 1))
     virtual_nodes_before2 = 2 * virtual_nodes_level2 - count_ones(virtual_nodes_level2)
 
-    block_size = options.block_size
+    block_size = something(options.block_size, 256)
     num_blocks = (num_src + block_size - 1) ÷ block_size
     backend = get_backend(src)
 
@@ -166,8 +166,8 @@ end
 
     # At most 2N sprouted checks from N src
     temp = @localmem eltype(dst) (0x2 * block_size,)
-    temp_offset = @localmem typeof(iblock) (1,)
-    block_dst_offset = @localmem typeof(iblock) (1,)
+    temp_offset = @localmem eltype(dst_offsets) (1,)
+    block_dst_offset = @localmem eltype(dst_offsets) (1,)
 
     # Write the initial offset for this block as zero. This will be atomically incremented as new
     # pairs are written to temp
@@ -234,7 +234,7 @@ function traverse_nodes_right!(bvh1, bvh2, src::AbstractGPUVector, dst::Abstract
     virtual_nodes_level2 = bvh2.tree.virtual_leaves >> (bvh2.tree.levels - (level2 - 1))
     virtual_nodes_before2 = 2 * virtual_nodes_level2 - count_ones(virtual_nodes_level2)
 
-    block_size = options.block_size
+    block_size = something(options.block_size, 256)
     num_blocks = (num_src + block_size - 1) ÷ block_size
     backend = get_backend(src)
 
@@ -269,8 +269,8 @@ end
 
     # At most 2N sprouted checks from N src
     temp = @localmem eltype(dst) (0x2 * block_size,)
-    temp_offset = @localmem typeof(iblock) (1,)
-    block_dst_offset = @localmem typeof(iblock) (1,)
+    temp_offset = @localmem eltype(dst_offsets) (1,)
+    block_dst_offset = @localmem eltype(dst_offsets) (1,)
 
     # Write the initial offset for this block as zero. This will be atomically incremented as new
     # pairs are written to temp
@@ -336,7 +336,7 @@ function traverse_nodes_leaves_left!(bvh1, bvh2, src::AbstractGPUVector, dst::Ab
 
     num_above2 = pow2(bvh2.tree.levels - 1) - 1
 
-    block_size = options.block_size
+    block_size = something(options.block_size, 256)
     num_blocks = (num_src + block_size - 1) ÷ block_size
     backend = get_backend(src)
 
@@ -371,8 +371,8 @@ end
 
     # At most 2N sprouted checks from N src
     temp = @localmem eltype(dst) (0x2 * block_size,)
-    temp_offset = @localmem typeof(iblock) (1,)
-    block_dst_offset = @localmem typeof(iblock) (1,)
+    temp_offset = @localmem eltype(dst_offsets) (1,)
+    block_dst_offset = @localmem eltype(dst_offsets) (1,)
 
     # Write the initial offset for this block as zero. This will be atomically incremented as new
     # pairs are written to temp
@@ -437,7 +437,7 @@ function traverse_nodes_leaves_right!(bvh1, bvh2, src::AbstractGPUVector, dst::A
     virtual_nodes_level2 = bvh2.tree.virtual_leaves >> (bvh2.tree.levels - (level2 - 1))
     virtual_nodes_before2 = 2 * virtual_nodes_level2 - count_ones(virtual_nodes_level2)
 
-    block_size = options.block_size
+    block_size = something(options.block_size, 256)
     num_blocks = (num_src + block_size - 1) ÷ block_size
     backend = get_backend(src)
 
@@ -472,8 +472,8 @@ end
 
     # At most 2N sprouted checks from N src
     temp = @localmem eltype(dst) (0x2 * block_size,)
-    temp_offset = @localmem typeof(iblock) (1,)
-    block_dst_offset = @localmem typeof(iblock) (1,)
+    temp_offset = @localmem eltype(dst_offsets) (1,)
+    block_dst_offset = @localmem eltype(dst_offsets) (1,)
 
     # Write the initial offset for this block as zero. This will be atomically incremented as new
     # pairs are written to temp
@@ -535,7 +535,7 @@ function traverse_leaves_pair!(bvh1, bvh2, src::AbstractGPUVector, contacts::Abs
     num_above1 = pow2(bvh1.tree.levels - 1) - 1
     num_above2 = pow2(bvh2.tree.levels - 1) - 1
 
-    block_size = options.block_size
+    block_size = something(options.block_size, 256)
     num_blocks = (num_src + block_size - 1) ÷ block_size
     backend = get_backend(src)
 
@@ -568,8 +568,8 @@ end
 
     # At most N sprouted checks from N src
     temp = @localmem eltype(dst) (block_size,)
-    temp_offset = @localmem typeof(iblock) (1,)
-    block_dst_offset = @localmem typeof(iblock) (1,)
+    temp_offset = @localmem eltype(dst_offsets) (1,)
+    block_dst_offset = @localmem eltype(dst_offsets) (1,)
 
     # Write the initial offset for this block as zero. This will be atomically incremented as new
     # pairs are written to temp

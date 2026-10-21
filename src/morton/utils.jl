@@ -26,6 +26,8 @@ function _compute_extrema(bounding_volumes::AbstractVector, options)
             max_tasks=options.num_threads,
             min_elems=options.min_mortons_per_thread,
         )
+    elseif isnothing(options.block_size)
+        AK.Auto()
     else
         AK.BlockReduce(block_size=options.block_size)
     end

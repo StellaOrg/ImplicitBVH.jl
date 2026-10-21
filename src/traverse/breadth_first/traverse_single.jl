@@ -103,7 +103,7 @@ function fill_initial_bvtt_single!(bvtt1, num_levels, start_level, level_nodes, 
     # Add initial checks; see the CPU branch for the simple code; triangular for loops like this
     # can be linearised for GPU one-per-thread access
     backend = get_backend(bvtt1)
-    if backend isa GPU
+    if !(backend isa CPU)
 
         # Convert linear index k to upper triangular (i, j) indices for a matrix of side n; 0-index
         function tri_ij(n::I, k::I) where I <: Integer
@@ -120,7 +120,11 @@ function fill_initial_bvtt_single!(bvtt1, num_levels, start_level, level_nodes, 
 
         if start_level != num_levels
             # First add n_lin node-node pair checks, then another n self-checks
-            AK.foreachindex(1:n_lin + n, backend, block_size=options.block_size) do i_lin
+            AK.foreachindex(
+                1:n_lin + n;
+                backend=backend,
+                block_size=_foreachindex_block_size(backend, options.block_size),
+            ) do i_lin
                 if i_lin > n_lin
                     i = i_lin - n_lin - 1 + level_nodes
                     @inbounds bvtt1[i_lin] = (i, i)
@@ -135,7 +139,11 @@ function fill_initial_bvtt_single!(bvtt1, num_levels, start_level, level_nodes, 
             return num_bvtt
         else
             # Only node-node pair checks at the last level
-            AK.foreachindex(1:n_lin, backend, block_size=options.block_size) do i_lin
+            AK.foreachindex(
+                1:n_lin;
+                backend=backend,
+                block_size=_foreachindex_block_size(backend, options.block_size),
+            ) do i_lin
                 i, j = tri_ij(n, i_lin - 1)
 
                 i += level_nodes

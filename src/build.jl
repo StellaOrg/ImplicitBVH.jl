@@ -236,7 +236,7 @@ function BVH(
         skips = cache.skips
         length(skips) == tree.levels || resize!(skips, tree.levels)
     end
-    compute_skips!(skips, tree)
+    compute_skips!(skips, tree, options)
 
     # Compute level up to which tree should be built
     built_ilevel = compute_build_level(tree, built_level)
@@ -244,16 +244,19 @@ function BVH(
     # Compute morton codes for the bounding volumes
     morton_encode!(bounding_volumes_wrapped, options)
 
+    # Sort bounding volumes along the Z-curve - closer objects have closer Morton codes
     alg = if get_backend(bounding_volumes_wrapped) isa CPU
         AK.CPUThreads.SampleSort(
             max_tasks=options.num_threads, 
             min_elems=options.min_sorts_per_thread,
         )
+    elseif isnothing(options.block_size)
+        # Known at compile-time
+        AK.Auto()
     else
         AK.MergeSort(block_size=options.block_size)
     end
 
-    # Sort bounding volumes along the Z-curve - closer objects have closer Morton codes
     AK.sort!(
         bounding_volumes_wrapped, by=bv->bv.morton,
         alg=alg,
@@ -344,11 +347,8 @@ function wrap_bounding_volumes(bounding_volumes, options)
     index_exemplar = IndexType(0)
     morton_dummy = MortonType(0)
 
-    AK.foreachindex(
-        bounding_volumes,
-        block_size=options.block_size,
-        max_tasks=options.num_threads,
-    ) do i
+    block_size = _foreachindex_block_size(get_backend(bounding_volumes), options.block_size)
+    AK.foreachindex(bounding_volumes, block_size=block_size, max_tasks=options.num_threads) do i
         bounding_volumes_wrapped[i] = BoundingVolume(
             bounding_volumes[i],
             typeof(index_exemplar)(i),
@@ -420,7 +420,7 @@ function aggregate_last_level_kernel!(
     AK.foreachindex(
         irange;
         backend=backend,
-        block_size=options.block_size,
+        block_size=_foreachindex_block_size(backend, options.block_size),
         max_tasks=options.num_threads,
         min_elems=options.min_boundings_per_thread,
     ) do i
@@ -500,7 +500,7 @@ function aggregate_level_kernel!(
     AK.foreachindex(
         irange;
         backend=backend,
-        block_size=options.block_size,
+        block_size=_foreachindex_block_size(backend, options.block_size),
         max_tasks=options.num_threads,
         min_elems=options.min_boundings_per_thread,
     ) do i

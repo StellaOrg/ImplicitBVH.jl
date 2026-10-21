@@ -86,7 +86,12 @@ function traverse_lvt(
 
     # Accumulate numbers of contacts to get thread offsets to write contacts based on
     alg = if get_backend(thread_ncontacts) isa CPU
-        AK.CPUThreads.Partitioned(max_tasks=1)
+        AK.CPUThreads.Partitioned(
+            max_tasks=options.num_threads,
+            min_elems=options.min_traversals_per_thread,
+        )
+    elseif isnothing(options.block_size)
+        AK.Auto()
     else
         AK.ScanPrefixes(block_size=options.block_size)
     end
@@ -156,7 +161,11 @@ function traverse_contacts_lvt!(
         end
     else
         # GPU implementation
-        AK.foreachindex(1:num_checks, backend, block_size=options.block_size) do i
+        AK.foreachindex(
+            1:num_checks;
+            backend=backend,
+            block_size=_foreachindex_block_size(backend, options.block_size),
+        ) do i
             I = get_index_type(bvh1)
             stack = SimpleMVector{32, I}(undef)
             iwrite = if isnothing(contacts)
